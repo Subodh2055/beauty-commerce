@@ -1,0 +1,87 @@
+{
+  "name": "Beauty Commerce — Order Notifications",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "beauty-orders",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Order Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "beauty-orders"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verify the HMAC-SHA256 signature from FastAPI (X-Signature header).\nconst crypto = require('crypto');\nconst secret = $env.N8N_WEBHOOK_SECRET || '';\nconst signature = $input.first().headers['x-signature'];\nconst raw = JSON.stringify({ event: $json.event, data: $json.data });\nconst expected = crypto.createHmac('sha256', secret).update(raw).digest('hex');\nif (!secret || signature !== expected) {\n  throw new Error('Invalid or missing signature');\n}\nreturn $input.all();"
+      },
+      "id": "verify",
+      "name": "Verify Signature",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.event }}", "rightValue": "order.placed", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "placed" },
+            { "conditions": { "options": {}, "conditions": [{ "leftValue": "={{ $json.event }}", "rightValue": "order.status_changed", "operator": { "type": "string", "operation": "equals" } }] }, "outputKey": "status" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch",
+      "name": "Route by Event",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@beautycommerce.com",
+        "toEmail": "={{ $json.data.recipient_email || $json.data.recipient }}",
+        "subject": "=Order {{ $json.data.order_number }} confirmed",
+        "html": "=<h2>Thank you for your order!</h2><p>Order <b>{{ $json.data.order_number }}</b> — total {{ $json.data.currency }} {{ $json.data.total }}.</p><p>We'll email you when it ships.</p>",
+        "options": {}
+      },
+      "id": "email-placed",
+      "name": "Send Confirmation Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [980, 220],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@beautycommerce.com",
+        "toEmail": "={{ $json.data.recipient_email || $json.data.recipient }}",
+        "subject": "=Order {{ $json.data.order_number }}: {{ $json.data.status }}",
+        "html": "=<h2>Order update</h2><p>Order <b>{{ $json.data.order_number }}</b> is now <b>{{ $json.data.status }}</b>.</p>",
+        "options": {}
+      },
+      "id": "email-status",
+      "name": "Send Status Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [980, 380],
+      "credentials": {}
+    }
+  ],
+  "connections": {
+    "Order Event Webhook": { "main": [[{ "node": "Verify Signature", "type": "main", "index": 0 }]] },
+    "Verify Signature": { "main": [[{ "node": "Route by Event", "type": "main", "index": 0 }]] },
+    "Route by Event": {
+      "main": [
+        [{ "node": "Send Confirmation Email", "type": "main", "index": 0 }],
+        [{ "node": "Send Status Email", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

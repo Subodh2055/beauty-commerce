@@ -1,0 +1,281 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Theme tokens. A single bright, premium light theme — used regardless of the
+   OS colour-scheme preference (we intentionally don't switch to dark).
+   Dark tokens remain defined under data-theme="dark" for possible future use,
+   but nothing sets that attribute today.
+--------------------------------------------------------------------------- */
+
+:root {
+  --background: #fdfbf8;
+  --background-tint: #f7f0ea;
+  --foreground: #221d1b;
+  --surface: #ffffff;
+  --surface-2: #f4eee8;
+  --muted: #79706a;
+  --border: #ebe3da;
+  --accent: #b03a5b;
+  --accent-hover: #963050;
+  --accent-foreground: #ffffff;
+  --accent-soft: #f7e5ea;
+  --gold: #c69a5b;
+  --gold-soft: #f5ecdd;
+  --success: #2f855a;
+  --danger: #d14343;
+  --ring: #b03a5b;
+  --shadow-color: 28 20 18;
+}
+
+:root[data-theme="dark"] {
+  --background: #17140f;
+  --background-tint: #1f1a15;
+  --foreground: #f3ece2;
+  --surface: #211c17;
+  --surface-2: #2b241d;
+  --muted: #b0a599;
+  --border: #372f26;
+  --accent: #e79bb2;
+  --accent-hover: #f0b3c5;
+  --accent-foreground: #211c17;
+  --accent-soft: #3a2029;
+  --gold: #dcbc86;
+  --gold-soft: #322a1e;
+  --success: #6cd39a;
+  --danger: #f08a8a;
+  --ring: #e79bb2;
+  --shadow-color: 0 0 0;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-tint: var(--background-tint);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-soft: var(--accent-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-serif: var(--font-playfair);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Theme transition: recolor smoothly when the toggle flips. */
+:root.theme-anim,
+:root.theme-anim * {
+  transition:
+    background-color 0.4s ease,
+    border-color 0.4s ease,
+    color 0.4s ease;
+}
+
+/* ---------------------------------------------------------------------------
+   Motion
+--------------------------------------------------------------------------- */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@layer utilities {
+  .font-serif {
+    font-family: var(--font-serif), Georgia, serif;
+  }
+  .container-x {
+    @apply mx-auto w-full max-w-[1800px] px-4 sm:px-6 lg:px-10 xl:px-14;
+  }
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Soft elevation used by cards and panels. */
+  .shadow-soft {
+    box-shadow: 0 1px 2px rgb(var(--shadow-color) / 0.04),
+      0 12px 32px -12px rgb(var(--shadow-color) / 0.14);
+  }
+  .shadow-lift {
+    box-shadow: 0 2px 4px rgb(var(--shadow-color) / 0.06),
+      0 24px 48px -16px rgb(var(--shadow-color) / 0.22);
+  }
+
+  /* Entrance animations (used directly or via <Reveal>). */
+  .animate-fade-up {
+    animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-fade-in {
+    animation: fade-in 0.8s ease both;
+  }
+  .animate-scale-in {
+    animation: scale-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .animate-float {
+    animation: float-y 6s ease-in-out infinite;
+  }
+  .animate-slide-in-right {
+    animation: slide-in-right 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  /* Scroll reveal: hidden until [data-show], then eases in. Staggered by index. */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: calc(var(--reveal-i, 0) * 70ms);
+    will-change: opacity, transform;
+  }
+  .reveal[data-show="true"] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* Shimmer sweep for the skeletons. */
+  .shimmer {
+    position: relative;
+    overflow: hidden;
+  }
+  .shimmer::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--shadow-color) / 0.06),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+
+  .animate-marquee {
+    animation: marquee 32s linear infinite;
+  }
+
+  /* Animated gradient underline for nav links. */
+  .link-underline {
+    background-image: linear-gradient(var(--accent), var(--accent));
+    background-size: 0% 1.5px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.3s ease;
+  }
+  .link-underline:hover {
+    background-size: 100% 1.5px;
+  }
+}
+
+/* Respect users who prefer less motion. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+}

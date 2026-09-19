@@ -1,0 +1,14 @@
+# Normalise line endings: store text as LF in the repo.
+* text=auto eol=lf
+
+# Binary/asset types git shouldn't touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

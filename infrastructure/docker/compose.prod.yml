@@ -1,0 +1,122 @@
+name: beauty-commerce
+
+x-api-env: &api-env
+  env_file:
+    - ../../.env
+  environment:
+    APP_ENV: production
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    REDIS_URL: redis://redis:6379/0
+    CELERY_BROKER_URL: redis://redis:6379/1
+    CELERY_RESULT_BACKEND: redis://redis:6379/2
+    N8N_BASE_URL: http://n8n:5678
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build:
+      context: ../../apps/api
+    <<: *api-env
+    command: alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ../../apps/api
+    <<: *api-env
+    restart: always
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips="*"
+    expose:
+      - "8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ../../apps/api
+    <<: *api-env
+    restart: always
+    command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: always
+    environment:
+      N8N_HOST: ${N8N_HOST:-n8n.example.com}
+      N8N_PROTOCOL: https
+      WEBHOOK_URL: https://${N8N_HOST:-n8n.example.com}/
+      GENERIC_TIMEZONE: Asia/Kathmandu
+    expose:
+      - "5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  web:
+    build:
+      context: ../../apps/web
+      target: prod
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    restart: always
+    environment:
+      API_INTERNAL_URL: http://api:8000/api/v1
+    expose:
+      - "3000"
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/conf.d:/etc/nginx/conf.d:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - web
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:
+  certbot_certs:

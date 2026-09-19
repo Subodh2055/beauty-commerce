@@ -1,0 +1,112 @@
+name: beauty-commerce
+
+x-api-env: &api-env
+  env_file:
+    - ../../.env
+  environment:
+    DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-beauty}:${POSTGRES_PASSWORD:-beauty}@postgres:5432/${POSTGRES_DB:-beauty_commerce}
+    REDIS_URL: redis://redis:6379/0
+    CELERY_BROKER_URL: redis://redis:6379/1
+    CELERY_RESULT_BACKEND: redis://redis:6379/2
+    N8N_BASE_URL: http://n8n:5678
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-beauty}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-beauty}
+      POSTGRES_DB: ${POSTGRES_DB:-beauty_commerce}
+    ports:
+      - "${POSTGRES_HOST_PORT:-15432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beauty} -d ${POSTGRES_DB:-beauty_commerce}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_HOST_PORT:-16379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ../../apps/api
+    <<: *api-env
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../apps/api/app:/app/app
+      - ../../apps/api/alembic:/app/alembic
+      - ../../apps/api/tests:/app/tests
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ../../apps/api
+    <<: *api-env
+    command: celery -A app.workers.celery_app worker --loglevel=info
+    volumes:
+      - ../../apps/api/app:/app/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  n8n:
+    image: n8nio/n8n:latest
+    restart: unless-stopped
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      GENERIC_TIMEZONE: Asia/Kathmandu
+      N8N_SECURE_COOKIE: "false"
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+
+  web:
+    build:
+      context: ../../apps/web
+      target: dev
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      API_INTERNAL_URL: http://api:8000/api/v1
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../apps/web:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:
+  web_node_modules:
+  web_next:

@@ -1,0 +1,43 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# Flutter
+apps/mobile/build/
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins*
+
+# Docker volumes / data
+infrastructure/docker/data/
+
+# Uploaded media
+apps/api/uploads/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
