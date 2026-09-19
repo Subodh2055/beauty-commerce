@@ -27,6 +27,17 @@ export interface AuthUser {
   roles: string[];
 }
 
+export const ADMIN_ROLES = ["STAFF", "ADMIN", "SUPER_ADMIN"];
+
+export function isAdmin(user: Pick<AuthUser, "roles"> | null | undefined): boolean {
+  return !!user && user.roles.some((r) => ADMIN_ROLES.includes(r));
+}
+
+/** Where a user should land after signing in, based on role. */
+export function roleLanding(user: AuthUser | null | undefined): string {
+  return isAdmin(user) ? "/admin" : "/account";
+}
+
 interface Tokens {
   access_token: string;
   refresh_token: string;
@@ -130,9 +141,10 @@ const actions = {
     });
     setSession({ user: r.user, ...r.tokens });
   },
-  async login(email: string, password: string) {
+  async login(email: string, password: string): Promise<AuthUser> {
     const r = await post<{ user: AuthUser; tokens: Tokens }>("/auth/login", { email, password });
     setSession({ user: r.user, ...r.tokens });
+    return r.user;
   },
   async logout() {
     const s = getSnapshot().session;

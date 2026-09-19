@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
-import { useAuth } from "@/lib/auth";
+import { roleLanding, useAuth } from "@/lib/auth";
 import { toast } from "@/lib/toast";
 import { AuthCard, FormError } from "@/components/auth/auth-card";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,13 @@ export default function LoginPage() {
   const { login, user, ready } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/account";
+  // Honour an explicit ?next=, otherwise send each role to its home.
+  const next = params.get("next");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (ready && user) router.replace(next);
+    if (ready && user) router.replace(next || roleLanding(user));
   }, [ready, user, next, router]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -27,9 +28,9 @@ export default function LoginPage() {
     setBusy(true);
     const fd = new FormData(e.currentTarget);
     try {
-      await login(String(fd.get("email")), String(fd.get("password")));
-      toast.success("Welcome back");
-      router.replace(next);
+      const signedIn = await login(String(fd.get("email")), String(fd.get("password")));
+      toast.success(signedIn.roles.some((r) => r !== "CUSTOMER") ? "Welcome back, admin" : "Welcome back");
+      router.replace(next || roleLanding(signedIn));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not sign in");
       setBusy(false);

@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
-import { useAuth } from "@/lib/auth";
+import { isAdmin as checkAdmin, useAuth } from "@/lib/auth";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const ADMIN_ROLES = new Set(["STAFF", "ADMIN", "SUPER_ADMIN"]);
 
 const NAV = [
   { href: "/admin", label: "Dashboard" },
@@ -22,7 +20,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const { user, ready } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const isAdmin = !!user && user.roles.some((r) => ADMIN_ROLES.has(r));
+  const isAdmin = checkAdmin(user);
 
   useEffect(() => {
     if (!ready) return;

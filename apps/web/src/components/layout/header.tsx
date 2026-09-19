@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { useStore } from "@/lib/store";
-import { useAuth } from "@/lib/auth";
+import { isAdmin as checkAdmin, useAuth } from "@/lib/auth";
 import type { CategoryTree } from "@/lib/api";
 import {
   BagIcon,
@@ -20,8 +20,6 @@ interface Props {
   categories: CategoryTree[];
 }
 
-const ADMIN_ROLES = ["STAFF", "ADMIN", "SUPER_ADMIN"];
-
 export function Header({ categories }: Props) {
   const { cartCount, wishlist, hydrated } = useStore();
   const { user } = useAuth();
@@ -30,7 +28,7 @@ export function Header({ categories }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
 
-  const isAdmin = !!user && user.roles.some((r) => ADMIN_ROLES.includes(r));
+  const isAdmin = checkAdmin(user);
 
   function onSearch(e: FormEvent) {
     e.preventDefault();
