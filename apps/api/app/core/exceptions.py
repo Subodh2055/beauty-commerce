@@ -44,6 +44,26 @@ class UnauthorizedError(AppError):
     code = "unauthorized"
 
 
+class TokenExpiredError(UnauthorizedError):
+    """A JWT was well-formed but past its `exp`.
+
+    Subclasses UnauthorizedError so existing handlers still catch it; the
+    distinct code lets the client tell "refresh me" from "sign in again".
+    """
+
+    code = "token_expired"
+
+
+class SessionExpiredError(UnauthorizedError):
+    """The session itself is over — idle timeout or absolute cap.
+
+    Unlike token_expired this is not recoverable by refreshing; the client
+    must send the user back to sign-in.
+    """
+
+    code = "session_expired"
+
+
 class ForbiddenError(AppError):
     status_code = status.HTTP_403_FORBIDDEN
     code = "forbidden"
