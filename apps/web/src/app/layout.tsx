@@ -6,6 +6,7 @@ import { StoreProvider } from "@/lib/store";
 import { AuthProvider } from "@/lib/auth";
 import { WishlistSync } from "@/components/wishlist-sync";
 import { CartSync } from "@/components/cart-sync";
+import { SessionTimeout } from "@/components/auth/session-timeout";
 import { Toaster } from "@/lib/toast";
 import { getCategoryTree, type CategoryTree } from "@/lib/api";
 import "./globals.css";
@@ -47,6 +48,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <StoreProvider>
             <WishlistSync />
             <CartSync />
+            <SessionTimeout />
             <Header categories={categories} />
             <main className="flex-1">{children}</main>
             <Footer categories={categories} />
