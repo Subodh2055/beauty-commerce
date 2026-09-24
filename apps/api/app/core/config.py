@@ -37,8 +37,17 @@ class Settings(BaseSettings):
     jwt_secret: str = "dev-only-access-secret-change-me-in-production!!"
     jwt_refresh_secret: str = "dev-only-refresh-secret-change-me-in-production!"
     jwt_algorithm: str = "HS256"
-    access_token_expire_minutes: int = 15
-    refresh_token_expire_days: int = 30
+    # Kept short so an access token cannot outlive an idled-out session by much:
+    # the idle check happens at refresh time, so this bounds the overshoot.
+    access_token_expire_minutes: int = 5
+    # Session lifetime, enforced for every role.
+    #   idle     — the session dies this long after its last use. Each refresh
+    #              rotates the token and slides the window forward, so it is a
+    #              true inactivity timeout.
+    #   absolute — a hard ceiling measured from sign-in that activity cannot
+    #              extend. Carried as the `sst` claim on both token types.
+    session_idle_timeout_minutes: int = 40
+    session_absolute_timeout_hours: int = 8
 
     # Uploads / media
     upload_dir: str = "uploads"  # relative to apps/api (or absolute)
@@ -69,6 +78,19 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [o.strip() for o in v.split(",") if o.strip()]
         return v
+
+    @model_validator(mode="after")
+    def _check_session_windows(self) -> "Settings":
+        if self.session_idle_timeout_minutes > self.session_absolute_timeout_hours * 60:
+            raise ValueError(
+                "SESSION_IDLE_TIMEOUT_MINUTES cannot exceed SESSION_ABSOLUTE_TIMEOUT_HOURS"
+            )
+        if self.access_token_expire_minutes > self.session_idle_timeout_minutes:
+            raise ValueError(
+                "ACCESS_TOKEN_EXPIRE_MINUTES cannot exceed SESSION_IDLE_TIMEOUT_MINUTES, "
+                "or an access token would outlive the idle window"
+            )
+        return self
 
     @model_validator(mode="after")
     def _refuse_dev_secrets_in_production(self) -> "Settings":
