@@ -29,6 +29,8 @@ async def store_refresh_token(
     *,
     jti: str,
     user_id: uuid.UUID,
+    session_id: str,
+    session_started_at: datetime,
     expires_at: datetime,
     user_agent: str | None,
     ip_address: str | None,
@@ -37,6 +39,8 @@ async def store_refresh_token(
         RefreshToken(
             jti=jti,
             user_id=user_id,
+            session_id=session_id,
+            session_started_at=session_started_at,
             expires_at=expires_at,
             created_at=datetime.now(UTC),
             user_agent=(user_agent or "")[:300] or None,
@@ -53,6 +57,15 @@ async def revoke_refresh_token(db: AsyncSession, jti: str) -> None:
     await db.execute(
         update(RefreshToken)
         .where(RefreshToken.jti == jti, RefreshToken.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
+
+
+async def revoke_session(db: AsyncSession, session_id: str) -> None:
+    """End one sign-in (all tokens rotated from it), leaving other devices alone."""
+    await db.execute(
+        update(RefreshToken)
+        .where(RefreshToken.session_id == session_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=datetime.now(UTC))
     )
 
