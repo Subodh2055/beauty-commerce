@@ -2,20 +2,32 @@
 
 Security notes:
 - Passwords hashed with argon2 (pwdlib).
-- Access tokens are short-lived JWTs; refresh tokens are long-lived JWTs whose
-  `jti` is tracked in `refresh_tokens` so they can be rotated and revoked.
+- Access tokens are short-lived JWTs; refresh tokens carry the idle window and
+  are tracked by `jti` in `refresh_tokens` so they can be rotated and revoked.
 - Refresh rotation detects reuse of an already-revoked token and revokes the
   whole family (treat as theft).
+- Sessions have two deadlines, both applied to every role:
+  idle (SESSION_IDLE_TIMEOUT_MINUTES, default 40) is the refresh token's own
+  lifetime and slides forward on each rotation; absolute
+  (SESSION_ABSOLUTE_TIMEOUT_HOURS, default 8) is anchored to sign-in via the
+  `sst` claim and cannot be extended. Either one raises SessionExpiredError.
 - Email verification and password-reset delivery are logged, not emailed, until
   SMTP is configured (Phase 8). The tokens themselves are real and enforced.
 """
 
-from datetime import UTC, datetime
+import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.exceptions import ConflictError, UnauthorizedError, ValidationFailedError
+from app.core.exceptions import (
+    ConflictError,
+    SessionExpiredError,
+    TokenExpiredError,
+    UnauthorizedError,
+    ValidationFailedError,
+)
 from app.core.logging import get_logger
 from app.core.security import (
     create_purpose_token,
@@ -70,15 +82,38 @@ def _to_user_out(user: User) -> UserOut:
     )
 
 
-async def _issue_tokens(db: AsyncSession, user: User, meta: RequestMeta) -> TokenPair:
+async def _issue_tokens(
+    db: AsyncSession,
+    user: User,
+    meta: RequestMeta,
+    *,
+    session_id: str | None = None,
+    session_started_at: datetime | None = None,
+) -> TokenPair:
+    """Mint an access/refresh pair.
+
+    Omit `session_id`/`session_started_at` to begin a new session (sign-in);
+    pass the stored values to continue an existing one (refresh rotation), which
+    is what keeps the absolute cap anchored to the original sign-in.
+    """
+    now = datetime.now(UTC)
+    session_id = session_id or uuid.uuid4().hex
+    session_started_at = session_started_at or now
+
     roles = [r.name for r in user.roles]
-    access = create_token(str(user.id), "access", {"roles": roles})
-    refresh = create_token(str(user.id), "refresh")
+    # `sst` lets any request check the absolute cap straight from the token,
+    # with no extra query.
+    session_claims = {"sid": session_id, "sst": int(session_started_at.timestamp())}
+    access = create_token(str(user.id), "access", {"roles": roles, **session_claims})
+    refresh = create_token(str(user.id), "refresh", session_claims)
+
     payload = decode_token(refresh, "refresh")
     await repo.store_refresh_token(
         db,
         jti=payload["jti"],
         user_id=user.id,
+        session_id=session_id,
+        session_started_at=session_started_at,
         expires_at=datetime.fromtimestamp(payload["exp"], tz=UTC),
         user_agent=meta[0],
         ip_address=meta[1],
@@ -131,7 +166,15 @@ async def login(db: AsyncSession, email: str, password: str, meta: RequestMeta) 
 
 
 async def refresh(db: AsyncSession, refresh_token: str, meta: RequestMeta) -> TokenPair:
-    payload = decode_token(refresh_token, "refresh")
+    try:
+        payload = decode_token(refresh_token, "refresh")
+    except TokenExpiredError as exc:
+        # The refresh token's lifetime is the idle window, so an expired one
+        # means the session simply went quiet for too long.
+        raise SessionExpiredError(
+            f"You were signed out after {settings.session_idle_timeout_minutes} "
+            "minutes of inactivity."
+        ) from exc
     jti = payload["jti"]
     stored = await repo.get_refresh_token(db, jti)
 
@@ -143,15 +186,37 @@ async def refresh(db: AsyncSession, refresh_token: str, meta: RequestMeta) -> To
         await db.commit()
         log.warning("refresh_token_reuse", user_id=str(stored.user_id), jti=jti)
         raise UnauthorizedError("Refresh token has been revoked")
-    if stored.expires_at <= datetime.now(UTC):
-        raise UnauthorizedError("Refresh token has expired")
+    now = datetime.now(UTC)
+    if stored.expires_at <= now:
+        # Belt and braces: the JWT `exp` normally fires first.
+        await repo.revoke_session(db, stored.session_id)
+        await db.commit()
+        raise SessionExpiredError(
+            f"You were signed out after {settings.session_idle_timeout_minutes} "
+            "minutes of inactivity."
+        )
+    if now - stored.session_started_at >= timedelta(hours=settings.session_absolute_timeout_hours):
+        # Hard ceiling: no amount of activity extends a session past this.
+        await repo.revoke_session(db, stored.session_id)
+        await db.commit()
+        log.info("session_absolute_timeout", user_id=str(stored.user_id), sid=stored.session_id)
+        raise SessionExpiredError(
+            f"Your session reached its {settings.session_absolute_timeout_hours}-hour limit. "
+            "Please sign in again."
+        )
 
     user = await repo.get_user_by_id(db, stored.user_id)
     if user is None or not user.is_active:
         raise UnauthorizedError("Account is unavailable")
 
     await repo.revoke_refresh_token(db, jti)  # rotate
-    tokens = await _issue_tokens(db, user, meta)
+    tokens = await _issue_tokens(
+        db,
+        user,
+        meta,
+        session_id=stored.session_id,
+        session_started_at=stored.session_started_at,
+    )
     await db.commit()
     return tokens
 
