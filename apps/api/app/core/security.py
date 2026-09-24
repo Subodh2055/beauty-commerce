@@ -13,7 +13,7 @@ import jwt
 from pwdlib import PasswordHash
 
 from app.core.config import settings
-from app.core.exceptions import UnauthorizedError
+from app.core.exceptions import TokenExpiredError, UnauthorizedError
 
 _password_hash = PasswordHash.recommended()
 
@@ -43,7 +43,9 @@ def create_token(
     if token_type == "access":
         expires = now + timedelta(minutes=settings.access_token_expire_minutes)
     else:
-        expires = now + timedelta(days=settings.refresh_token_expire_days)
+        # The refresh token's own lifetime IS the idle window: rotation on every
+        # refresh slides it forward, so a session with no traffic simply lapses.
+        expires = now + timedelta(minutes=settings.session_idle_timeout_minutes)
 
     payload: dict[str, Any] = {
         "sub": subject,
@@ -60,7 +62,7 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
     try:
         payload = jwt.decode(token, _secret_for(expected_type), algorithms=[settings.jwt_algorithm])
     except jwt.ExpiredSignatureError as exc:
-        raise UnauthorizedError("Token has expired") from exc
+        raise TokenExpiredError("Token has expired") from exc
     except jwt.InvalidTokenError as exc:
         raise UnauthorizedError("Invalid token") from exc
 
