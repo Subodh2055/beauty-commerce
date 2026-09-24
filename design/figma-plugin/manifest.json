@@ -1,0 +1,15 @@
+{
+  "name": "Beauty Commerce Design Generator",
+  "id": "beauty-commerce-design-generator",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "networkAccess": {
+    "allowedDomains": [
+      "https://picsum.photos",
+      "https://fastly.picsum.photos",
+      "https://i.picsum.photos"
+    ],
+    "reasoning": "Loads placeholder product/editorial imagery so the generated mockups look like the real storefront. The plugin falls back to flat swatches if the network is unavailable."
+  }
+}
