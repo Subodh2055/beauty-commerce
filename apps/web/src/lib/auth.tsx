@@ -15,6 +15,13 @@
  */
 
 import { createContext, useContext, useMemo, useSyncExternalStore, type ReactNode } from "react";
+import {
+  clearLastActivity,
+  sessionStartedAt,
+  syncSessionCookie,
+  writeLastActivity,
+  type LogoutReason,
+} from "./session";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 const KEY = "beauty-commerce:auth:v1";
@@ -45,6 +52,17 @@ interface Tokens {
 
 interface Stored extends Tokens {
   user: AuthUser;
+  /** Epoch ms of sign-in, read from the access token's `sst` claim. */
+  session_started_at: number;
+}
+
+/** Why the last session ended, for the login page to explain. */
+let lastLogoutReason: LogoutReason | null = null;
+
+export function takeLogoutReason(): LogoutReason | null {
+  const r = lastLogoutReason;
+  lastLogoutReason = null;
+  return r;
 }
 
 export class AuthError extends Error {
@@ -93,7 +111,17 @@ function setSession(session: Stored | null) {
   } catch {
     /* private mode */
   }
+  if (session) writeLastActivity();
+  else clearLastActivity();
+  // Keep the middleware's httpOnly copy in step (fire and forget).
+  void syncSessionCookie(session?.access_token ?? null);
   listeners.forEach((l) => l());
+}
+
+/** Tear down the session locally and record why, without a server round-trip. */
+function endSession(reason: LogoutReason) {
+  lastLogoutReason = reason;
+  setSession(null);
 }
 
 function subscribe(cb: () => void) {
@@ -139,11 +167,19 @@ const actions = {
       password,
       full_name: fullName || null,
     });
-    setSession({ user: r.user, ...r.tokens });
+    setSession({
+      user: r.user,
+      ...r.tokens,
+      session_started_at: sessionStartedAt(r.tokens.access_token),
+    });
   },
   async login(email: string, password: string): Promise<AuthUser> {
     const r = await post<{ user: AuthUser; tokens: Tokens }>("/auth/login", { email, password });
-    setSession({ user: r.user, ...r.tokens });
+    setSession({
+      user: r.user,
+      ...r.tokens,
+      session_started_at: sessionStartedAt(r.tokens.access_token),
+    });
     return r.user;
   },
   async logout() {
@@ -155,7 +191,20 @@ const actions = {
         /* best-effort revoke */
       }
     }
-    setSession(null);
+    endSession("manual");
+  },
+
+  /** Exchange the refresh token for a new pair. Throws AuthError on failure. */
+  async refreshTokens(): Promise<void> {
+    const s = getSnapshot().session;
+    if (!s) return;
+    const t = await post<Tokens>("/auth/refresh", { refresh_token: s.refresh_token });
+    setSession({ ...s, ...t, session_started_at: sessionStartedAt(t.access_token) });
+  },
+
+  /** Drop the session locally, recording why (drives the login-page notice). */
+  expire(reason: LogoutReason) {
+    endSession(reason);
   },
   async requestPasswordReset(email: string): Promise<string> {
     const r = await post<{ message: string }>("/auth/password/reset-request", { email });
@@ -183,11 +232,14 @@ const actions = {
 
     try {
       const t = await post<Tokens>("/auth/refresh", { refresh_token: s.refresh_token });
-      const next = { ...s, ...t };
+      const next = { ...s, ...t, session_started_at: sessionStartedAt(t.access_token) };
       setSession(next);
       res = await fetch(`${API}${path}`, withAuth(next.access_token));
-    } catch {
-      setSession(null);
+    } catch (err) {
+      // session_expired = idle or absolute timeout; anything else is a revoked
+      // or malformed token. Either way the user must sign in again.
+      const code = err instanceof AuthError ? err.code : "";
+      endSession(code === "session_expired" ? "idle" : "revoked");
     }
     return res;
   },
@@ -198,6 +250,11 @@ const actions = {
 export interface AuthApi {
   user: AuthUser | null;
   ready: boolean;
+  /** Epoch ms of sign-in, or null when signed out. Drives the absolute cap. */
+  sessionStartedAt: number | null;
+  refreshTokens: typeof actions.refreshTokens;
+  expire: typeof actions.expire;
+  accessToken: string | null;
   register: typeof actions.register;
   login: typeof actions.login;
   logout: typeof actions.logout;
@@ -216,6 +273,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user: state.session?.user ?? null,
       ready: state.ready,
+      sessionStartedAt: state.session?.session_started_at ?? null,
+      accessToken: state.session?.access_token ?? null,
       ...actions,
     }),
     [state],
