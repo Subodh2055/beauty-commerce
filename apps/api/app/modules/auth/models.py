@@ -22,6 +22,12 @@ class RefreshToken(UUIDMixin, Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False
     )
+    # Every token minted by rotating this one shares `session_id` and keeps the
+    # original `session_started_at`, so the absolute cap survives rotation and a
+    # single sign-in can be revoked without touching the user's other devices.
+    session_id: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    session_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # When this individual token lapses — i.e. the sliding idle deadline.
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
