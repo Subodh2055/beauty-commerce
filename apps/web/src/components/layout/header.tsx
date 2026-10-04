@@ -15,6 +15,7 @@ import {
   UserIcon,
 } from "@/components/ui/icons";
 import { MobileNav } from "./mobile-nav";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface Props {
   categories: CategoryTree[];
@@ -45,7 +46,7 @@ export function Header({ categories }: Props) {
         <div className="container-x flex h-16 items-center gap-3 sm:gap-4">
           <button
             type="button"
-            className="focus-ring -ml-2 rounded-full p-2 lg:hidden"
+            className="focus-ring -ml-2 inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2 lg:hidden"
             onClick={() => setOpen(true)}
             aria-label="Open menu"
             aria-expanded={open}
@@ -97,7 +98,7 @@ export function Header({ categories }: Props) {
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 placeholder="Search perfumes, serums…"
-                className="focus-ring h-10 w-full rounded-full border border-border bg-surface pl-10 pr-4 text-sm placeholder:text-muted"
+                className="focus-ring h-10 w-full rounded-full border border-border-strong bg-surface pl-10 pr-4 text-sm placeholder:text-muted"
               />
             </label>
           </form>
@@ -105,14 +106,15 @@ export function Header({ categories }: Props) {
           <div className="ml-auto flex items-center gap-0.5 md:ml-0 sm:gap-1">
             <Link
               href="/search"
-              className="focus-ring rounded-full p-2 hover:bg-surface-2 md:hidden"
+              className="focus-ring inline-flex h-11 w-11 items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2 md:hidden"
               aria-label="Search"
             >
               <SearchIcon />
             </Link>
+            <ThemeToggle className="hidden sm:inline-flex" />
             <Link
               href="/account"
-              className="focus-ring relative rounded-full p-2 hover:bg-surface-2"
+              className="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2"
               aria-label={user ? "Your account" : "Sign in"}
             >
               <UserIcon />
@@ -122,7 +124,7 @@ export function Header({ categories }: Props) {
             </Link>
             <Link
               href="/wishlist"
-              className="focus-ring relative rounded-full p-2 hover:bg-surface-2"
+              className="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2"
               aria-label={`Wishlist, ${wishlist.length} items`}
             >
               <HeartIcon />
@@ -130,7 +132,7 @@ export function Header({ categories }: Props) {
             </Link>
             <Link
               href="/cart"
-              className="focus-ring relative rounded-full p-2 hover:bg-surface-2"
+              className="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2"
               aria-label={`Cart, ${cartCount} items`}
             >
               <BagIcon />
@@ -188,11 +190,11 @@ function Dropdown({ category, active }: { category: CategoryTree; active: boolea
         />
       </Link>
       {/* Panel: shown on hover/focus */}
-      <div className="invisible absolute left-0 top-full pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-        <div className="min-w-52 rounded-2xl border border-border bg-surface p-2 shadow-lift">
+      <div className="invisible absolute left-0 top-full pt-2 opacity-0 transition-all duration-(--duration-base) group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
+        <div className="min-w-52 rounded-card border border-border bg-surface p-2 shadow-lift">
           <Link
             href={`/categories/${category.slug}`}
-            className="focus-ring block rounded-xl px-3 py-2 text-sm font-medium hover:bg-surface-2"
+            className="focus-ring block rounded-control px-3 py-2 text-sm font-medium hover:bg-surface-2"
           >
             All {category.name}
           </Link>
@@ -200,7 +202,7 @@ function Dropdown({ category, active }: { category: CategoryTree; active: boolea
             <Link
               key={child.id}
               href={`/categories/${child.slug}`}
-              className="focus-ring block rounded-xl px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-foreground"
+              className="focus-ring block rounded-control px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-foreground"
             >
               {child.name}
             </Link>
@@ -213,7 +215,7 @@ function Dropdown({ category, active }: { category: CategoryTree; active: boolea
 
 function Count({ n }: { n: number }) {
   return (
-    <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground">
+    <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-accent px-1 text-2xs font-bold text-accent-foreground">
       {n > 99 ? "99+" : n}
     </span>
   );
