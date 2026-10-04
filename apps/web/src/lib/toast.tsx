@@ -7,6 +7,7 @@
  */
 
 import { useSyncExternalStore } from "react";
+import { AlertIcon, CheckIcon, CloseIcon, InfoIcon } from "@/components/ui/icons";
 
 export type ToastType = "success" | "error" | "info";
 
@@ -61,10 +62,15 @@ const EMPTY: Toast[] = [];
 const getSnapshot = () => toasts;
 const getServerSnapshot = () => EMPTY;
 
-const ICONS: Record<ToastType, string> = { success: "✓", error: "!", info: "i" };
+const ICONS: Record<ToastType, (p: { width: number; height: number }) => React.ReactNode> = {
+  success: CheckIcon,
+  error: AlertIcon,
+  info: InfoIcon,
+};
+// Text/background pairs are AA-checked in scripts/check-contrast.mjs.
 const TONES: Record<ToastType, string> = {
-  success: "border-success/30 bg-success/12 text-success",
-  error: "border-danger/30 bg-danger/12 text-danger",
+  success: "border-success/25 bg-success-soft text-success",
+  error: "border-danger/25 bg-danger-soft text-danger",
   info: "border-border bg-surface text-foreground",
 };
 
@@ -72,38 +78,35 @@ export function Toaster() {
   const items = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 top-4 z-[100] flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:right-4 sm:top-4 sm:items-end sm:px-0"
+      className="pointer-events-none fixed inset-x-0 top-4 z-100 flex flex-col items-center gap-2 px-4 sm:inset-x-auto sm:right-4 sm:top-4 sm:items-end sm:px-0"
       role="region"
       aria-live="polite"
       aria-label="Notifications"
     >
-      {items.map((t) => (
-        <div
-          key={t.id}
-          className={`animate-slide-in-right pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-lift backdrop-blur ${TONES[t.type]}`}
-          role="status"
-        >
-          <span
-            className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-              t.type === "info" ? "bg-surface-2" : "bg-current/15"
-            }`}
-            aria-hidden
+      {items.map((t) => {
+        const Icon = ICONS[t.type];
+        return (
+          <div
+            key={t.id}
+            className={`animate-slide-in-right pointer-events-auto flex w-full max-w-sm items-start gap-3 rounded-card border px-4 py-3 text-sm shadow-lift ${TONES[t.type]}`}
+            // The region announces politely; errors interrupt.
+            role={t.type === "error" ? "alert" : undefined}
           >
-            {ICONS[t.type]}
-          </span>
-          <p className="flex-1 leading-snug">{t.message}</p>
-          <button
-            type="button"
-            onClick={() => toast.dismiss(t.id)}
-            className="focus-ring -mr-1 shrink-0 rounded p-0.5 opacity-60 hover:opacity-100"
-            aria-label="Dismiss"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
-              <path d="M6 6l12 12M18 6 6 18" />
-            </svg>
-          </button>
-        </div>
-      ))}
+            <span className="mt-0.5 shrink-0">
+              <Icon width={18} height={18} />
+            </span>
+            <p className="flex-1 leading-snug">{t.message}</p>
+            <button
+              type="button"
+              onClick={() => toast.dismiss(t.id)}
+              className="focus-ring -my-1.5 -mr-2 inline-flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-pill opacity-70 transition-opacity duration-(--duration-fast) hover:opacity-100"
+              aria-label="Dismiss notification"
+            >
+              <CloseIcon width={14} height={14} />
+            </button>
+          </div>
+        );
+      })}
     </div>
   );
 }
