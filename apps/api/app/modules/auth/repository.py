@@ -1,7 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.auth.models import RefreshToken
@@ -76,3 +76,10 @@ async def revoke_all_for_user(db: AsyncSession, user_id: uuid.UUID) -> None:
         .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
         .values(revoked_at=datetime.now(UTC))
     )
+
+
+async def purge_expired_refresh_tokens(db: AsyncSession, now: datetime) -> int:
+    """Delete rows whose token has lapsed. Safe for reuse detection: the JWT `exp`
+    equals `expires_at`, so a lapsed token is rejected before its row is looked up."""
+    result = await db.execute(delete(RefreshToken).where(RefreshToken.expires_at < now))
+    return result.rowcount or 0
