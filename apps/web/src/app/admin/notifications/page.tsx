@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAdmin, type AdminNotification } from "@/lib/auth";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
 
 const CHANNEL_NOTE: Record<string, string> = {
@@ -37,7 +38,51 @@ export default function AdminNotifications() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!rows) return <Skeleton className="h-64" />;
+
+  const columns: Column<AdminNotification>[] = [
+    {
+      key: "when",
+      header: "When",
+      className: "whitespace-nowrap text-muted",
+      cell: (n) => new Date(n.created_at).toLocaleString("en-GB"),
+    },
+    {
+      key: "event",
+      header: "Event",
+      cell: (n) => (
+        <>
+          <p className="font-medium">{n.event}</p>
+          <p className="text-xs text-muted">{n.subject}</p>
+        </>
+      ),
+    },
+    {
+      key: "recipient",
+      header: "Recipient",
+      responsive: "hidden md:table-cell",
+      cell: (n) => <span className="text-muted">{n.recipient ?? "—"}</span>,
+    },
+    {
+      key: "channel",
+      header: "Channel",
+      cell: (n) => (
+        <>
+          <Badge>{n.channel}</Badge>
+          <p className="mt-1 text-xs text-muted">{CHANNEL_NOTE[n.channel]}</p>
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (n) => (
+        <>
+          <Badge tone={STATUS_TONE[n.status] ?? "neutral"}>{n.status.toLowerCase()}</Badge>
+          {n.error && <p className="mt-1 text-xs text-danger">{n.error}</p>}
+        </>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-4">
@@ -45,47 +90,14 @@ export default function AdminNotifications() {
         Every order notification the system emitted. Channel shows how it was delivered —
         configure n8n or SMTP to move off the log fallback.
       </p>
-      {rows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border p-10 text-center text-muted">
-          No notifications yet.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="p-3">When</th>
-                <th className="p-3">Event</th>
-                <th className="p-3">Recipient</th>
-                <th className="p-3">Channel</th>
-                <th className="p-3">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((n) => (
-                <tr key={n.id} className="border-t border-border">
-                  <td className="p-3 text-muted whitespace-nowrap">
-                    {new Date(n.created_at).toLocaleString("en-GB")}
-                  </td>
-                  <td className="p-3">
-                    <p className="font-medium">{n.event}</p>
-                    <p className="text-xs text-muted">{n.subject}</p>
-                  </td>
-                  <td className="p-3 text-muted">{n.recipient ?? "—"}</td>
-                  <td className="p-3">
-                    <Badge>{n.channel}</Badge>
-                    <p className="mt-1 text-xs text-muted">{CHANNEL_NOTE[n.channel]}</p>
-                  </td>
-                  <td className="p-3">
-                    <Badge tone={STATUS_TONE[n.status] ?? "neutral"}>{n.status.toLowerCase()}</Badge>
-                    {n.error && <p className="mt-1 text-xs text-danger">{n.error}</p>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Notifications"
+        columns={columns}
+        rows={rows ?? []}
+        rowKey={(n) => n.id}
+        loading={!rows}
+        empty={<EmptyState compact title="No notifications yet" description="Order emails and n8n events will be listed here." />}
+      />
     </div>
   );
 }
