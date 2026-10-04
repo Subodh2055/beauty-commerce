@@ -2,15 +2,18 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useAuth } from "@/lib/auth";
 import { useStore } from "@/lib/store";
 import type { CategoryTree } from "@/lib/api";
 import { toast } from "@/lib/toast";
+import { Drawer } from "@/components/ui/drawer";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { controlClass } from "@/components/ui/field";
+import { buttonClass } from "@/components/ui/button";
 import {
   BagIcon,
   ChevronDownIcon,
-  CloseIcon,
   HeartIcon,
   SearchIcon,
   UserIcon,
@@ -30,16 +33,6 @@ export function MobileNav({ open, onClose, categories, isAdmin }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
-  // Lock body scroll while the drawer is open.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
-
   function go(href: string) {
     onClose();
     router.push(href);
@@ -52,41 +45,54 @@ export function MobileNav({ open, onClose, categories, isAdmin }: Props) {
     router.push(term ? `/search?q=${encodeURIComponent(term)}` : "/products");
   }
 
-  return (
-    <div
-      className={`fixed inset-0 z-50 lg:hidden ${open ? "" : "pointer-events-none"}`}
-      aria-hidden={!open}
-    >
-      {/* backdrop */}
-      <div
-        onClick={onClose}
-        className={`absolute inset-0 bg-foreground/40 backdrop-blur-sm transition-opacity duration-300 ${
-          open ? "opacity-100" : "opacity-0"
-        }`}
-      />
-      {/* panel */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Menu"
-        className={`absolute inset-y-0 left-0 flex w-[86vw] max-w-sm flex-col bg-background shadow-2xl transition-transform duration-300 ease-out ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <div className="flex items-center justify-between border-b border-border px-5 py-4">
-          <Link href="/" onClick={onClose} className="font-serif text-xl font-semibold">
-            Beauty<span className="text-accent">.</span>
-          </Link>
-          <button
-            type="button"
-            onClick={onClose}
-            className="focus-ring rounded-full p-2 hover:bg-surface-2"
-            aria-label="Close menu"
-          >
-            <CloseIcon />
-          </button>
-        </div>
+  const account = (
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        <QuickAction icon={<UserIcon />} label="Account" onClick={() => go("/account")} />
+        <QuickAction
+          icon={<HeartIcon />}
+          label="Wishlist"
+          badge={wishlist.length}
+          onClick={() => go("/wishlist")}
+        />
+        <QuickAction icon={<BagIcon />} label="Bag" badge={cartCount} onClick={() => go("/cart")} />
+      </div>
+      {user ? (
+        <button
+          type="button"
+          onClick={() => {
+            logout().then(() => {
+              toast.info("Signed out");
+              onClose();
+              router.push("/");
+            });
+          }}
+          className={buttonClass("outline", "md", "mt-3 w-full")}
+        >
+          Sign out
+        </button>
+      ) : (
+        <button type="button" onClick={() => go("/login")} className={buttonClass("primary", "md", "mt-3 w-full")}>
+          Sign in
+        </button>
+      )}
+    </div>
+  );
 
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title="Menu"
+      side="left"
+      className="lg:hidden"
+      header={
+        <Link href="/" onClick={onClose} className="font-display text-2xl font-semibold">
+          Beauty<span className="text-accent">.</span>
+        </Link>
+      }
+      footer={account}
+    >
         <form onSubmit={onSearch} role="search" className="border-b border-border p-4">
           <label className="relative block">
             <span className="sr-only">Search</span>
@@ -96,7 +102,7 @@ export function MobileNav({ open, onClose, categories, isAdmin }: Props) {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search products…"
-              className="focus-ring h-11 w-full rounded-full border border-border bg-surface pl-10 pr-4 text-sm"
+              className={`${controlClass} h-11 rounded-pill pl-10 pr-4`}
             />
           </label>
         </form>
@@ -111,7 +117,7 @@ export function MobileNav({ open, onClose, categories, isAdmin }: Props) {
                   type="button"
                   onClick={() => setExpanded((e) => (e === c.id ? null : c.id))}
                   aria-expanded={expanded === c.id}
-                  className="focus-ring flex w-full items-center justify-between rounded-xl px-3 py-3 text-base hover:bg-surface-2"
+                  className="focus-ring flex w-full items-center justify-between rounded-control px-3 py-3 text-base hover:bg-surface-2"
                 >
                   {c.name}
                   <ChevronDownIcon
@@ -142,45 +148,12 @@ export function MobileNav({ open, onClose, categories, isAdmin }: Props) {
 
           <DrawerLink onClick={() => go("/brands")}>Brands</DrawerLink>
           {isAdmin && <DrawerLink onClick={() => go("/admin")}>Admin</DrawerLink>}
-        </nav>
-
-        <div className="border-t border-border p-4">
-          <div className="grid grid-cols-3 gap-2">
-            <QuickAction icon={<UserIcon />} label="Account" onClick={() => go("/account")} />
-            <QuickAction
-              icon={<HeartIcon />}
-              label="Wishlist"
-              badge={wishlist.length}
-              onClick={() => go("/wishlist")}
-            />
-            <QuickAction icon={<BagIcon />} label="Bag" badge={cartCount} onClick={() => go("/cart")} />
+          <div className="mt-2 flex items-center justify-between rounded-control px-3 py-1 text-base">
+            Appearance
+            <ThemeToggle />
           </div>
-          {user ? (
-            <button
-              type="button"
-              onClick={() => {
-                logout().then(() => {
-                  toast.info("Signed out");
-                  onClose();
-                  router.push("/");
-                });
-              }}
-              className="focus-ring mt-3 w-full rounded-full border border-border py-2.5 text-sm hover:bg-surface-2"
-            >
-              Sign out
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => go("/login")}
-              className="focus-ring mt-3 w-full rounded-full bg-accent py-2.5 text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-            >
-              Sign in
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+        </nav>
+    </Drawer>
   );
 }
 
@@ -197,7 +170,7 @@ function DrawerLink({
     <button
       type="button"
       onClick={onClick}
-      className={`focus-ring block w-full rounded-xl px-3 py-3 text-left text-base hover:bg-surface-2 ${
+      className={`focus-ring block w-full rounded-control px-3 py-3 text-left text-base hover:bg-surface-2 ${
         muted ? "text-sm text-muted" : ""
       }`}
     >
@@ -221,12 +194,12 @@ function QuickAction({
     <button
       type="button"
       onClick={onClick}
-      className="focus-ring relative flex flex-col items-center gap-1 rounded-xl border border-border py-3 text-xs hover:bg-surface-2"
+      className="focus-ring relative flex flex-col items-center gap-1 rounded-control border border-border py-3 text-xs hover:bg-surface-2"
     >
       <span className="relative">
         {icon}
         {badge ? (
-          <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-bold text-accent-foreground">
+          <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-2xs font-bold text-accent-foreground">
             {badge > 99 ? "99+" : badge}
           </span>
         ) : null}
