@@ -1,0 +1,9 @@
+# Dev stack entry point: `docker compose up --build` from the repo root.
+# The services live in infrastructure/docker/compose.dev.yml. `env_file` points
+# that file's ${VAR} interpolation at the root .env (it would otherwise look in
+# infrastructure/docker/), so no --env-file flag is needed.
+name: beauty-commerce
+
+include:
+  - path: infrastructure/docker/compose.dev.yml
+    env_file: .env
