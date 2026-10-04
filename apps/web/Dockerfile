@@ -28,6 +28,9 @@ FROM node:22-alpine AS prod
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# server.js binds to $HOSTNAME, which Docker sets to the container id; listen
+# on all interfaces so the localhost healthcheck can reach it.
+ENV HOSTNAME=0.0.0.0
 RUN addgroup -S nextjs && adduser -S nextjs -G nextjs
 COPY --from=build --chown=nextjs:nextjs /app/.next/standalone ./
 COPY --from=build --chown=nextjs:nextjs /app/.next/static ./.next/static
