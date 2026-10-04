@@ -19,6 +19,28 @@ user_roles = Table(
 )
 
 
+role_permissions = Table(
+    "role_permissions",
+    Base.metadata,
+    Column(
+        "role_id", UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True
+    ),
+    Column(
+        "permission_id",
+        UUID(as_uuid=True),
+        ForeignKey("permissions.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
+
+
+class Permission(UUIDMixin, Base):
+    __tablename__ = "permissions"
+
+    code: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(String(255))
+
+
 class Role(UUIDMixin, Base):
     __tablename__ = "roles"
 
@@ -26,6 +48,10 @@ class Role(UUIDMixin, Base):
     description: Mapped[str | None] = mapped_column(String(255))
 
     users: Mapped[list["User"]] = relationship(secondary=user_roles, back_populates="roles")
+    # Loaded with the user's roles on every authenticated request (one extra query).
+    permissions: Mapped[list[Permission]] = relationship(
+        secondary=role_permissions, lazy="selectin"
+    )
 
 
 class User(UUIDMixin, TimestampMixin, Base):
@@ -48,6 +74,15 @@ class User(UUIDMixin, TimestampMixin, Base):
 
     def has_role(self, *names: str) -> bool:
         return any(r.name in names for r in self.roles)
+
+    @property
+    def permission_codes(self) -> set[str]:
+        return {p.code for r in self.roles for p in r.permissions}
+
+    def has_permission(self, code: str) -> bool:
+        # SUPER_ADMIN is unrestricted, including for permissions added after its
+        # role_permissions rows were seeded.
+        return self.has_role("SUPER_ADMIN") or code in self.permission_codes
 
 
 class Address(UUIDMixin, TimestampMixin, Base):
