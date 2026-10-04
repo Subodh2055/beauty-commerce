@@ -26,7 +26,7 @@ export function SearchForm({ initial }: { initial: string }) {
           onChange={(e) => setQ(e.target.value)}
           autoFocus={!initial}
           placeholder="Search products, brands, notes…"
-          className="focus-ring h-11 w-full rounded-full border border-border bg-surface pl-10 pr-4"
+          className="focus-ring h-11 w-full rounded-full border border-border-strong bg-surface pl-10 pr-4"
         />
       </label>
       <Button type="submit">Search</Button>

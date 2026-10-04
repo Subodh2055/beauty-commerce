@@ -5,7 +5,9 @@ import { useState, useTransition, type FormEvent } from "react";
 import type { ProductFacets } from "@/lib/api";
 import { formatMoney } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { CloseIcon, FilterIcon } from "@/components/ui/icons";
+import { Drawer } from "@/components/ui/drawer";
+import { controlClass } from "@/components/ui/field";
+import { FilterIcon } from "@/components/ui/icons";
 
 interface Props {
   facets: ProductFacets;
@@ -27,30 +29,11 @@ export function Filters({ facets, lock = {} }: Props) {
         <FilterForm facets={facets} lock={lock} />
       </aside>
 
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true">
-          <button
-            type="button"
-            className="absolute inset-0 bg-foreground/40"
-            onClick={() => setOpen(false)}
-            aria-label="Close filters"
-          />
-          <div className="absolute inset-y-0 left-0 w-[85vw] max-w-sm overflow-y-auto bg-background p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <p className="font-semibold">Filters</p>
-              <button
-                type="button"
-                className="focus-ring rounded-full p-1"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-              >
-                <CloseIcon />
-              </button>
-            </div>
-            <FilterForm facets={facets} lock={lock} onApplied={() => setOpen(false)} />
-          </div>
+      <Drawer open={open} onClose={() => setOpen(false)} title="Filters" side="left" className="lg:hidden">
+        <div className="p-5">
+          <FilterForm facets={facets} lock={lock} onApplied={() => setOpen(false)} />
         </div>
-      )}
+      </Drawer>
     </>
   );
 }
@@ -180,7 +163,7 @@ function FilterForm({
               inputMode="numeric"
               placeholder={facets.price_min ? formatMoney(facets.price_min) : "Min"}
               defaultValue={current.min_price}
-              className="focus-ring h-9 w-full rounded-lg border border-border bg-surface px-2"
+              className={`${controlClass} h-9 px-2`}
               aria-label="Minimum price"
             />
             <span className="text-muted">–</span>
@@ -191,7 +174,7 @@ function FilterForm({
               inputMode="numeric"
               placeholder={facets.price_max ? formatMoney(facets.price_max) : "Max"}
               defaultValue={current.max_price}
-              className="focus-ring h-9 w-full rounded-lg border border-border bg-surface px-2"
+              className={`${controlClass} h-9 px-2`}
               aria-label="Maximum price"
             />
           </div>
@@ -220,7 +203,7 @@ function FilterForm({
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <fieldset>
-      <legend className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted">
+      <legend className="mb-2 text-2xs font-semibold tracking-eyebrow text-muted uppercase">
         {title}
       </legend>
       <div className="space-y-1.5">{children}</div>
@@ -246,7 +229,7 @@ function Check({
           type="checkbox"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          className="focus-ring h-4 w-4 rounded border-border accent-[var(--accent)]"
+          className="focus-ring h-4 w-4 cursor-pointer rounded border-border-strong accent-accent"
         />
         <span className={checked ? "font-medium" : ""}>{label}</span>
       </span>
