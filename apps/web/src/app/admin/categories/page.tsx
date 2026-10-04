@@ -3,11 +3,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useAdmin, type AdminCategory } from "@/lib/auth";
 import { toast } from "@/lib/toast";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+import { Field, Select, Textarea } from "@/components/ui/field";
 import { FormError } from "@/components/auth/auth-card";
 import { ImageUpload } from "@/components/admin/image-upload";
+import { confirmDialog } from "@/components/ui/confirm";
 
 const blank = { name: "", description: "", image_url: "", parent_id: "", sort_order: 0, is_active: true };
 
@@ -85,10 +88,15 @@ export default function AdminCategories() {
   }
 
   async function onDelete(c: AdminCategory) {
-    const warn = c.product_count
-      ? `Delete "${c.name}"? ${c.product_count} product(s) will be uncategorised.`
-      : `Delete "${c.name}"?`;
-    if (!confirm(warn)) return;
+    const ok = await confirmDialog({
+      title: `Delete "${c.name}"?`,
+      description: c.product_count
+        ? `${c.product_count} product(s) will be uncategorised.`
+        : "This can't be undone.",
+      confirmLabel: "Delete category",
+      tone: "danger",
+    });
+    if (!ok) return;
     try {
       await admin.deleteCategory(c.id);
       if (editing?.id === c.id) reset();
@@ -99,85 +107,85 @@ export default function AdminCategories() {
     }
   }
 
+  const columns: Column<AdminCategory>[] = [
+    {
+      key: "category",
+      header: "Category",
+      cell: (c) => (
+        <>
+          <p className="font-medium">
+            {c.name}
+            {!c.is_active && (
+              <Badge tone="neutral" className="ml-2 align-middle">
+                inactive
+              </Badge>
+            )}
+          </p>
+          <p className="text-xs text-muted">{c.slug}</p>
+        </>
+      ),
+    },
+    {
+      key: "parent",
+      header: "Parent",
+      responsive: "hidden sm:table-cell",
+      cell: (c) => <span className="text-muted">{c.parent_id ? nameById(c.parent_id) : "—"}</span>,
+    },
+    { key: "products", header: "Products", align: "right", className: "tabular-nums", cell: (c) => c.product_count },
+    {
+      key: "actions",
+      header: "Actions",
+      cell: (c) => (
+        <div className="flex gap-1">
+          <Button size="sm" variant="outline" className="h-8! px-3! text-xs" onClick={() => edit(c)}>
+            Edit
+          </Button>
+          <Button size="sm" variant="ghost" className="h-8! px-3! text-xs text-danger hover:bg-danger-soft" onClick={() => onDelete(c)}>
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
       <div>
-        {!rows ? (
-          <Skeleton className="h-64" />
-        ) : (
-          <div className="overflow-x-auto rounded-2xl border border-border">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
-                <tr>
-                  <th className="p-3">Category</th>
-                  <th className="p-3">Parent</th>
-                  <th className="p-3 text-right">Products</th>
-                  <th className="p-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((c) => (
-                  <tr key={c.id} className="border-t border-border">
-                    <td className="p-3">
-                      <p className="font-medium">
-                        {c.name}
-                        {!c.is_active && <span className="ml-2 text-xs text-muted">(inactive)</span>}
-                      </p>
-                      <p className="text-xs text-muted">{c.slug}</p>
-                    </td>
-                    <td className="p-3 text-muted">{c.parent_id ? nameById(c.parent_id) : "—"}</td>
-                    <td className="p-3 text-right tabular-nums">{c.product_count}</td>
-                    <td className="p-3">
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" className="h-8! px-3! text-xs" onClick={() => edit(c)}>
-                          Edit
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8! px-3! text-xs text-danger hover:bg-danger/10" onClick={() => onDelete(c)}>
-                          Delete
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          caption="Categories"
+          columns={columns}
+          rows={rows ?? []}
+          rowKey={(c) => c.id}
+          loading={!rows}
+          empty={<EmptyState compact title="No categories yet" description="Add the first one with the form." />}
+        />
       </div>
 
-      <form onSubmit={onSubmit} className="h-fit space-y-3 rounded-2xl border border-border bg-surface p-5 shadow-soft">
-        <h2 className="font-serif text-lg font-semibold">{editing ? "Edit category" : "New category"}</h2>
+      <form onSubmit={onSubmit} className="h-fit space-y-3 rounded-card border border-border bg-surface p-5 shadow-soft">
+        <h2 className="font-display text-xl font-semibold">{editing ? "Edit category" : "New category"}</h2>
         <FormError message={error} />
         <Field label="Name" name="name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium">Parent</label>
-          <select value={form.parent_id} onChange={(e) => setForm({ ...form, parent_id: e.target.value })} className="focus-ring h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm">
-            <option value="">— (top level)</option>
-            {(rows ?? [])
-              .filter((c) => c.id !== editing?.id)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        </div>
+        <Select
+          label="Parent"
+          name="parent_id"
+          value={form.parent_id}
+          onChange={(e) => setForm({ ...form, parent_id: e.target.value })}
+          placeholder="— (top level)"
+          options={(rows ?? []).filter((c) => c.id !== editing?.id).map((c) => ({ value: c.id, label: c.name }))}
+        />
         <div className="space-y-1.5">
           <label className="block text-sm font-medium">Image</label>
           <ImageUpload value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
         </div>
         <Field label="Sort order" name="sort_order" type="number" value={String(form.sort_order)} onChange={(e) => setForm({ ...form, sort_order: Number(e.target.value) })} />
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium">Description</label>
-          <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} className="focus-ring w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm" />
-        </div>
+        <Textarea label="Description" name="description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={3} />
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="h-4 w-4 accent-[var(--accent)]" />
+          <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="focus-ring h-4 w-4 cursor-pointer accent-accent" />
           Active
         </label>
         <div className="flex gap-2">
-          <Button type="submit" disabled={busy} className="flex-1">
-            {busy ? "Saving…" : editing ? "Save" : "Create"}
+          <Button type="submit" loading={busy} className="flex-1">
+            {editing ? "Save" : "Create"}
           </Button>
           {editing && (
             <Button type="button" variant="ghost" onClick={reset}>
