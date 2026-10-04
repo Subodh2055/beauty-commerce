@@ -5,7 +5,7 @@ import type { ProductDetail } from "@/lib/api";
 import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
-import { MinusIcon, PlusIcon } from "@/components/ui/icons";
+import { MinusIcon, PlusIcon, CheckIcon } from "@/components/ui/icons";
 import { Price } from "./price";
 import { WishlistButton } from "./wishlist-button";
 
@@ -126,7 +126,15 @@ export function AddToCart({ product }: { product: ProductDetail }) {
           onClick={add}
           disabled={soldOut}
         >
-          {soldOut ? "Sold out" : added ? "Added ✓" : "Add to bag"}
+          {soldOut ? (
+          "Sold out"
+        ) : added ? (
+          <>
+            Added <CheckIcon width={16} height={16} />
+          </>
+        ) : (
+          "Add to bag"
+        )}
         </Button>
 
         <WishlistButton

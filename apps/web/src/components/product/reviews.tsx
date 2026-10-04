@@ -9,9 +9,10 @@ import { Rating } from "./rating";
 import { StarInput } from "./star-input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Field } from "@/components/ui/field";
+import { Field, Textarea } from "@/components/ui/field";
 import { FormError } from "@/components/auth/auth-card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { confirmDialog } from "@/components/ui/confirm";
 
 export function Reviews({ slug }: { slug: string }) {
   const { user, ready } = useAuth();
@@ -72,7 +73,7 @@ export function Reviews({ slug }: { slug: string }) {
 function Summary({ data }: { data: ReviewList }) {
   const { average, count, stars } = data.breakdown;
   return (
-    <div className="rounded-2xl bg-surface-2 p-5">
+    <div className="rounded-card bg-surface-2 p-5">
       <div className="flex items-end gap-3">
         <span className="font-serif text-4xl font-semibold">{Number(average).toFixed(1)}</span>
         <div className="pb-1">
@@ -127,7 +128,7 @@ function WriteReview({
 
   if (!user) {
     return (
-      <div className="rounded-2xl border border-border p-5 text-sm">
+      <div className="rounded-card border border-border p-5 text-sm">
         <p className="mb-3 text-muted">Sign in to write a review.</p>
         <Link
           href={`/login?next=/products/${slug}`}
@@ -164,7 +165,8 @@ function WriteReview({
   }
 
   async function onDelete() {
-    if (!confirm("Delete your review?")) return;
+    const ok = await confirmDialog({ title: "Delete your review?", confirmLabel: "Delete review", tone: "danger" });
+    if (!ok) return;
     setBusy(true);
     try {
       await remove(slug);
@@ -179,24 +181,12 @@ function WriteReview({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3 rounded-2xl border border-border p-5">
+    <form onSubmit={onSubmit} className="space-y-3 rounded-card border border-border p-5">
       <p className="text-sm font-medium">{existing ? "Edit your review" : "Write a review"}</p>
       <FormError message={error} />
       <StarInput value={rating} onChange={setRating} />
       <Field label="Title" name="title" defaultValue={existing?.title ?? ""} placeholder="Sum it up" />
-      <div className="space-y-1.5">
-        <label htmlFor="body" className="block text-sm font-medium">
-          Review
-        </label>
-        <textarea
-          id="body"
-          name="body"
-          rows={4}
-          defaultValue={existing?.body ?? ""}
-          placeholder="What did you think?"
-          className="focus-ring w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm placeholder:text-muted"
-        />
-      </div>
+      <Textarea label="Review" name="body" rows={4} defaultValue={existing?.body ?? ""} placeholder="What did you think?" />
       <div className="flex gap-2">
         <Button type="submit" disabled={busy} className="flex-1">
           {busy ? "Saving…" : existing ? "Update review" : "Submit review"}

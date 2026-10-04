@@ -2,7 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { toast } from "@/lib/toast";
-import { MailIcon } from "@/components/ui/icons";
+import { MailIcon, CheckIcon } from "@/components/ui/icons";
 
 /**
  * V1: client-only capture. Wire to an /api/v1 newsletter endpoint (or n8n
@@ -32,14 +32,20 @@ export function NewsletterForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="you@example.com"
-          className="focus-ring h-11 w-full rounded-full border border-border bg-background pl-11 pr-4 text-sm placeholder:text-muted"
+          className="focus-ring h-11 w-full rounded-full border border-border-strong bg-background pl-11 pr-4 text-sm placeholder:text-muted"
         />
       </label>
       <button
         type="submit"
         className="focus-ring h-11 shrink-0 rounded-full bg-accent px-5 text-sm font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
       >
-        {done ? "Subscribed ✓" : "Subscribe"}
+        {done ? (
+            <>
+              Subscribed <CheckIcon width={16} height={16} />
+            </>
+          ) : (
+            "Subscribe"
+          )}
       </button>
     </form>
   );
