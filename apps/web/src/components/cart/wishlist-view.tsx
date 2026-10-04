@@ -8,6 +8,7 @@ import { formatMoney } from "@/lib/format";
 import { ButtonLink } from "@/components/ui/button";
 import { HeartIcon } from "@/components/ui/icons";
 import { ProductGridSkeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function WishlistView() {
   const { wishlist, hydrated, toggleWishlist } = useStore();
@@ -16,10 +17,12 @@ export function WishlistView() {
 
   if (wishlist.length === 0) {
     return (
-      <div className="rounded-3xl border border-dashed border-border p-16 text-center">
-        <p className="mb-4 text-muted">Nothing saved yet. Tap the heart on any product.</p>
-        <ButtonLink href="/products">Browse products</ButtonLink>
-      </div>
+      <EmptyState
+        title="Nothing saved yet"
+        description="Tap the heart on any product to keep it here."
+        icon={<HeartIcon width={26} height={26} />}
+        action={<ButtonLink href="/products">Browse products</ButtonLink>}
+      />
     );
   }
 
@@ -29,7 +32,7 @@ export function WishlistView() {
         <li key={w.productId} className="group relative">
           <Link
             href={`/products/${w.slug}`}
-            className="focus-ring relative block aspect-[4/5] overflow-hidden rounded-2xl bg-surface-2"
+            className="focus-ring relative block aspect-[4/5] overflow-hidden rounded-card bg-surface-2"
           >
             {w.imageUrl && (
               <Image
@@ -37,7 +40,7 @@ export function WishlistView() {
                 alt=""
                 fill
                 sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                className="object-cover transition-transform duration-(--duration-slower) group-hover:scale-105"
               />
             )}
           </Link>
@@ -47,7 +50,7 @@ export function WishlistView() {
               toggleWishlist(w);
               toast.info(`Removed ${w.name} from wishlist`);
             }}
-            className="focus-ring absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-accent shadow-sm backdrop-blur"
+            className="focus-ring absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-surface/90 text-accent shadow-hairline backdrop-blur"
             aria-label={`Remove ${w.name} from wishlist`}
           >
             <HeartIcon filled />

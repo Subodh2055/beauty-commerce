@@ -6,8 +6,9 @@ import { useStore } from "@/lib/store";
 import { toast } from "@/lib/toast";
 import { formatMoney, pluralize } from "@/lib/format";
 import { Button, ButtonLink } from "@/components/ui/button";
-import { MinusIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
+import { BagIcon, MinusIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 const FREE_SHIPPING_THRESHOLD = 5000;
 const SHIPPING_FEE = 150;
@@ -38,10 +39,12 @@ export function CartView() {
 
   if (cart.length === 0) {
     return (
-      <div className="rounded-3xl border border-dashed border-border p-16 text-center">
-        <p className="mb-4 text-muted">Your bag is empty.</p>
-        <ButtonLink href="/products">Start shopping</ButtonLink>
-      </div>
+      <EmptyState
+        title="Your bag is empty"
+        description="Discover fragrances, skincare and colour from our curators."
+        icon={<BagIcon width={26} height={26} />}
+        action={<ButtonLink href="/products">Start shopping</ButtonLink>}
+      />
     );
   }
 
@@ -64,7 +67,7 @@ export function CartView() {
             <li key={l.variantId} className="flex gap-4 py-5">
               <Link
                 href={`/products/${l.slug}`}
-                className="relative h-28 w-22 shrink-0 overflow-hidden rounded-xl bg-surface-2"
+                className="relative h-28 w-22 shrink-0 overflow-hidden rounded-control bg-surface-2"
               >
                 {l.imageUrl && (
                   <Image src={l.imageUrl} alt="" fill sizes="88px" className="object-cover" />
@@ -118,7 +121,7 @@ export function CartView() {
         </ul>
       </div>
 
-      <aside className="h-fit space-y-4 rounded-3xl bg-surface-2 p-6 lg:sticky lg:top-24">
+      <aside className="h-fit space-y-4 rounded-panel bg-surface-2 p-6 lg:sticky lg:top-24">
         <h2 className="font-serif text-lg font-semibold">Summary</h2>
         <dl className="space-y-2 text-sm">
           <Row label="Subtotal" value={formatMoney(cartSubtotal, currency)} />

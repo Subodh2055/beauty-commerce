@@ -1,6 +1,7 @@
 import type { ProductSummary } from "@/lib/api";
 import { Reveal } from "@/components/ui/reveal";
 import { ProductCard } from "./product-card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function ProductGrid({
   products,
@@ -13,9 +14,7 @@ export function ProductGrid({
 }) {
   if (products.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border p-12 text-center text-muted">
-        {emptyMessage}
-      </div>
+      <EmptyState title="No matches" description={emptyMessage} />
     );
   }
   return (
