@@ -96,5 +96,19 @@ def require_roles(*roles: str) -> Callable[[User], Coroutine[Any, Any, User]]:
     return checker
 
 
+def require_permission(code: str) -> Callable[[User], Coroutine[Any, Any, User]]:
+    """Dependency factory enforcing that the current user holds `code`
+    (via any of their roles). Prefer this over `require_roles` for new routes."""
+
+    async def checker(user: CurrentUser) -> User:
+        if not user.has_permission(code):
+            raise ForbiddenError("You do not have permission to do this")
+        return user
+
+    # Lets tests and docs introspect which permission a route needs.
+    checker.required_permission = code  # type: ignore[attr-defined]
+    return checker
+
+
 # Anyone who can access the admin area (staff and above).
 AdminUser = Annotated[User, Depends(require_roles("STAFF", "ADMIN", "SUPER_ADMIN"))]
