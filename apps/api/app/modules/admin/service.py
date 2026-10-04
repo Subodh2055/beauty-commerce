@@ -22,16 +22,17 @@ from app.modules.admin.schemas import (
     ProductUpdateIn,
     ProductWriteIn,
 )
-from app.modules.catalog.models import Brand, Category, Product, ProductImage, ProductVariant
+from app.modules.catalog import service as catalog_service
+from app.modules.catalog.models import Brand, Category, Product, ProductVariant
 from app.modules.coupons.models import Coupon
 from app.modules.coupons.schemas import CouponCreateIn, CouponOut
 from app.modules.inventory import service as inventory_service
 from app.modules.notifications import service as notifications_service
-from app.modules.orders import repository as orders_repo
+from app.modules.orders import service as orders_service
 from app.modules.orders.models import Order, OrderStatusHistory
 from app.modules.orders.schemas import OrderDetail
 from app.modules.users.models import User
-from app.shared.enums import InventoryReason, OrderStatus, PaymentStatus
+from app.shared.enums import OrderStatus, PaymentStatus, ProductStatus
 from app.shared.pagination import Page, PageParams
 
 REVENUE_STATUSES = (
@@ -187,22 +188,9 @@ async def update_order_status(
 
     # Restock when cancelling/refunding an order that decremented stock.
     if new_status in RESTOCK_STATUSES:
-        variant_ids = [i.variant_id for i in order.items if i.variant_id]
-        if variant_ids:
-            locked = await orders_repo.get_variants_for_update(db, variant_ids)
-            for item in order.items:
-                v = locked.get(item.variant_id) if item.variant_id else None
-                if v is not None:
-                    v.stock_quantity += item.quantity
-                    inventory_service.record(
-                        db,
-                        v,
-                        item.quantity,
-                        InventoryReason.CANCEL,
-                        order_id=order.id,
-                        note=f"Order {new_status.lower()}",
-                        created_by=admin_id,
-                    )
+        await orders_service.restock_order(
+            db, order, note=f"Order {new_status.lower()}", created_by=admin_id
+        )
         order.payment_status = (
             PaymentStatus.REFUNDED if new_status == OrderStatus.REFUNDED else PaymentStatus.FAILED
         )
@@ -210,6 +198,7 @@ async def update_order_status(
         order.payment_status = PaymentStatus.PAID
 
     order.status = new_status
+    orders_service.apply_status_to_vendor_orders(order, new_status)
     order.history.append(
         OrderStatusHistory(
             status=new_status,
@@ -228,6 +217,33 @@ async def update_order_status(
     )
     await notifications_service.order_status_changed(db, order, email)
     return OrderDetail.model_validate(order)
+
+
+def _row(p: Product) -> AdminProductRow:
+    return AdminProductRow(
+        id=p.id,
+        name=p.name,
+        slug=p.slug,
+        sku=p.sku,
+        status=p.status,
+        is_featured=p.is_featured,
+        base_price=p.base_price,
+        currency=p.currency,
+        product_type=p.product_type,
+        brand_name=p.brand.name if p.brand else None,
+        vendor_name=p.vendor.name if p.vendor else None,
+        total_stock=sum(v.stock_quantity for v in p.variants),
+        rating_avg=p.rating_avg,
+        rating_count=p.rating_count,
+    )
+
+
+def _set_status(product: Product, status: str) -> None:
+    """Admins may set any status directly (moderation endpoints are the audited
+    happy path); publishing stamps published_at the first time."""
+    if status == ProductStatus.PUBLISHED and product.published_at is None:
+        product.published_at = datetime.now(UTC)
+    product.status = status
 
 
 async def list_products(
@@ -249,24 +265,7 @@ async def list_products(
         .all()
     )
 
-    items = [
-        AdminProductRow(
-            id=p.id,
-            name=p.name,
-            slug=p.slug,
-            sku=p.sku,
-            status=p.status,
-            is_featured=p.is_featured,
-            base_price=p.base_price,
-            currency=p.currency,
-            product_type=p.product_type,
-            brand_name=p.brand.name if p.brand else None,
-            total_stock=sum(v.stock_quantity for v in p.variants),
-            rating_avg=p.rating_avg,
-            rating_count=p.rating_count,
-        )
-        for p in rows
-    ]
+    items = [_row(p) for p in rows]
     return Page(items=items, total=total, page=page.page, size=page.size)
 
 
@@ -277,35 +276,12 @@ async def update_product(
     if product is None:
         raise NotFoundError("Product not found")
     if body.status is not None:
-        product.status = body.status
-        if body.status == "PUBLISHED" and product.published_at is None:
-            product.published_at = datetime.now(UTC)
+        _set_status(product, body.status)
     if body.is_featured is not None:
         product.is_featured = body.is_featured
     await db.commit()
     await db.refresh(product)
-    return AdminProductRow(
-        id=product.id,
-        name=product.name,
-        slug=product.slug,
-        sku=product.sku,
-        status=product.status,
-        is_featured=product.is_featured,
-        base_price=product.base_price,
-        currency=product.currency,
-        product_type=product.product_type,
-        brand_name=product.brand.name if product.brand else None,
-        total_stock=sum(v.stock_quantity for v in product.variants),
-        rating_avg=product.rating_avg,
-        rating_count=product.rating_count,
-    )
-
-
-def _slugify(text: str) -> str:
-    import re
-
-    s = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    return s or "product"
+    return _row(product)
 
 
 async def get_product_detail(db: AsyncSession, product_id: uuid.UUID) -> AdminProductDetail:
@@ -315,131 +291,11 @@ async def get_product_detail(db: AsyncSession, product_id: uuid.UUID) -> AdminPr
     return AdminProductDetail.model_validate(product)
 
 
-async def _unique_slug(db: AsyncSession, model, slug: str, exclude_id: uuid.UUID | None) -> str:
-    """Ensure `slug` is unique for `model`, appending -2, -3… if needed."""
-    base = slug
-    n = 1
-    while True:
-        stmt = select(model.id).where(model.slug == slug)
-        if exclude_id is not None:
-            stmt = stmt.where(model.id != exclude_id)
-        if await db.scalar(stmt) is None:
-            return slug
-        n += 1
-        slug = f"{base}-{n}"
-
-
-async def _ensure_unique_slug(db: AsyncSession, slug: str, exclude_id: uuid.UUID | None) -> str:
-    return await _unique_slug(db, Product, slug, exclude_id)
-
-
-async def _apply_scalars(db: AsyncSession, product: Product, body: ProductWriteIn) -> None:
-    if body.brand_id and not await db.get(Brand, body.brand_id):
-        raise ValidationFailedError("Brand not found")
-    if body.category_id and not await db.get(Category, body.category_id):
-        raise ValidationFailedError("Category not found")
-    product.sku = body.sku
-    product.name = body.name
-    product.short_description = body.short_description
-    product.description = body.description
-    product.product_type = body.product_type
-    product.brand_id = body.brand_id
-    product.category_id = body.category_id
-    product.base_price = body.base_price
-    product.compare_at_price = body.compare_at_price
-    product.currency = body.currency
-    product.tax_rate = body.tax_rate
-    product.is_featured = body.is_featured
-    product.attributes = body.attributes
-    product.tags = body.tags
-    if body.status == "PUBLISHED" and product.published_at is None:
-        product.published_at = datetime.now(UTC)
-    product.status = body.status
-
-
-def _reconcile_variants(product: Product, body: ProductWriteIn) -> None:
-    """Update existing variants by id, add new ones, drop removed ones.
-    Preserves variant ids so the inventory ledger and order history stay linked."""
-    existing = {v.id: v for v in product.variants}
-    seen: set[uuid.UUID] = set()
-    default_set = False
-
-    for i, vin in enumerate(body.variants):
-        is_default = vin.is_default and not default_set
-        if is_default:
-            default_set = True
-        sku = vin.sku or f"{body.sku}-{i + 1}"
-        if vin.id and vin.id in existing:
-            v = existing[vin.id]
-            v.name, v.sku, v.options = vin.name, sku, vin.options
-            v.price, v.compare_at_price = vin.price, vin.compare_at_price
-            v.stock_quantity, v.is_default, v.sort_order = (
-                vin.stock_quantity,
-                is_default,
-                vin.sort_order,
-            )
-            seen.add(vin.id)
-        else:
-            product.variants.append(
-                ProductVariant(
-                    name=vin.name,
-                    sku=sku,
-                    options=vin.options,
-                    price=vin.price,
-                    compare_at_price=vin.compare_at_price,
-                    stock_quantity=vin.stock_quantity,
-                    is_default=is_default,
-                    sort_order=vin.sort_order,
-                )
-            )
-    # Ensure exactly one default.
-    if not default_set and product.variants:
-        product.variants[0].is_default = True
-    for vid, v in existing.items():
-        if vid not in seen:
-            product.variants.remove(v)
-
-
-def _reconcile_images(product: Product, body: ProductWriteIn) -> None:
-    existing = {img.id: img for img in product.images}
-    seen: set[uuid.UUID] = set()
-    primary_set = False
-    for iin in body.images:
-        is_primary = iin.is_primary and not primary_set
-        if is_primary:
-            primary_set = True
-        if iin.id and iin.id in existing:
-            img = existing[iin.id]
-            img.url, img.alt, img.is_primary, img.sort_order = (
-                iin.url,
-                iin.alt,
-                is_primary,
-                iin.sort_order,
-            )
-            seen.add(iin.id)
-        else:
-            product.images.append(
-                ProductImage(
-                    url=iin.url, alt=iin.alt, is_primary=is_primary, sort_order=iin.sort_order
-                )
-            )
-    if not primary_set and product.images:
-        product.images[0].is_primary = True
-    for iid, img in existing.items():
-        if iid not in seen:
-            product.images.remove(img)
-
-
 async def create_product(db: AsyncSession, body: ProductWriteIn) -> AdminProductDetail:
-    if await db.scalar(select(Product.id).where(Product.sku == body.sku)):
-        raise ConflictError("A product with this SKU already exists")
-    slug = await _ensure_unique_slug(db, body.slug or _slugify(body.name), None)
-
-    product = Product(slug=slug)
-    await _apply_scalars(db, product, body)
-    product.slug = slug
-    _reconcile_variants(product, body)
-    _reconcile_images(product, body)
+    product = catalog_service.new_product()
+    await catalog_service.apply_write(db, product, body)
+    _set_status(product, body.status)
+    product.is_featured = body.is_featured
     db.add(product)
     await db.commit()
     await db.refresh(product)
@@ -452,16 +308,36 @@ async def update_product_full(
     product = await db.get(Product, product_id)
     if product is None:
         raise NotFoundError("Product not found")
-    if body.sku != product.sku and await db.scalar(
-        select(Product.id).where(Product.sku == body.sku, Product.id != product_id)
-    ):
-        raise ConflictError("A product with this SKU already exists")
+    await catalog_service.apply_write(db, product, body)
+    _set_status(product, body.status)
+    product.is_featured = body.is_featured
+    await db.commit()
+    await db.refresh(product)
+    return AdminProductDetail.model_validate(product)
 
-    slug = body.slug or product.slug
-    product.slug = await _ensure_unique_slug(db, slug, product_id)
-    await _apply_scalars(db, product, body)
-    _reconcile_variants(product, body)
-    _reconcile_images(product, body)
+
+# --- Moderation ---------------------------------------------------------------
+
+
+async def approve_product(
+    db: AsyncSession, product_id: uuid.UUID, reviewer_id: uuid.UUID
+) -> AdminProductDetail:
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise NotFoundError("Product not found")
+    catalog_service.approve(product, reviewer_id)
+    await db.commit()
+    await db.refresh(product)
+    return AdminProductDetail.model_validate(product)
+
+
+async def reject_product(
+    db: AsyncSession, product_id: uuid.UUID, reviewer_id: uuid.UUID, reason: str
+) -> AdminProductDetail:
+    product = await db.get(Product, product_id)
+    if product is None:
+        raise NotFoundError("Product not found")
+    catalog_service.reject(product, reviewer_id, reason)
     await db.commit()
     await db.refresh(product)
     return AdminProductDetail.model_validate(product)
@@ -495,7 +371,9 @@ async def list_brands_admin(db: AsyncSession) -> list[AdminBrandRow]:
 
 
 async def create_brand(db: AsyncSession, body: BrandWriteIn) -> AdminBrandRow:
-    slug = await _unique_slug(db, Brand, body.slug or _slugify(body.name), None)
+    slug = await catalog_service.unique_slug(
+        db, Brand, body.slug or catalog_service.slugify(body.name, "brand"), None
+    )
     brand = Brand(
         name=body.name,
         slug=slug,
@@ -515,7 +393,7 @@ async def update_brand(db: AsyncSession, brand_id: uuid.UUID, body: BrandWriteIn
     if brand is None:
         raise NotFoundError("Brand not found")
     brand.name = body.name
-    brand.slug = await _unique_slug(db, Brand, body.slug or brand.slug, brand_id)
+    brand.slug = await catalog_service.unique_slug(db, Brand, body.slug or brand.slug, brand_id)
     brand.description = body.description
     brand.logo_url = body.logo_url
     brand.country = body.country.upper() if body.country else None
@@ -549,7 +427,9 @@ async def list_categories_admin(db: AsyncSession) -> list[AdminCategoryRow]:
 async def create_category(db: AsyncSession, body: CategoryWriteIn) -> AdminCategoryRow:
     if body.parent_id and not await db.get(Category, body.parent_id):
         raise ValidationFailedError("Parent category not found")
-    slug = await _unique_slug(db, Category, body.slug or _slugify(body.name), None)
+    slug = await catalog_service.unique_slug(
+        db, Category, body.slug or catalog_service.slugify(body.name, "category"), None
+    )
     cat = Category(
         name=body.name,
         slug=slug,
@@ -576,7 +456,7 @@ async def update_category(
     if body.parent_id and not await db.get(Category, body.parent_id):
         raise ValidationFailedError("Parent category not found")
     cat.name = body.name
-    cat.slug = await _unique_slug(db, Category, body.slug or cat.slug, category_id)
+    cat.slug = await catalog_service.unique_slug(db, Category, body.slug or cat.slug, category_id)
     cat.description = body.description
     cat.image_url = body.image_url
     cat.parent_id = body.parent_id
