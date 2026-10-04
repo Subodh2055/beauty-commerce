@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useAdmin, type AdminOrderRow } from "@/lib/auth";
 import { toast } from "@/lib/toast";
 import { formatMoney } from "@/lib/format";
-import { Skeleton } from "@/components/ui/skeleton";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FilterChips } from "@/components/ui/filter-chips";
 import { OrderStatusBadge, PaymentStatusBadge, label } from "@/components/order/status-badge";
 import { Button } from "@/components/ui/button";
 
@@ -76,92 +78,93 @@ export default function AdminOrders() {
     }
   }
 
+  const columns: Column<AdminOrderRow>[] = [
+    {
+      key: "order",
+      header: "Order",
+      cell: (o) => (
+        <>
+          <p className="font-medium">{o.order_number}</p>
+          <p className="text-xs text-muted">
+            {new Date(o.created_at).toLocaleDateString("en-GB")} · {o.item_count} item
+            {o.item_count === 1 ? "" : "s"}
+          </p>
+        </>
+      ),
+    },
+    {
+      key: "customer",
+      header: "Customer",
+      responsive: "hidden md:table-cell",
+      cell: (o) => <span className="text-muted">{o.customer_email ?? "—"}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (o) => (
+        <div className="flex flex-col items-start gap-1">
+          <OrderStatusBadge status={o.status} />
+          <PaymentStatusBadge status={o.payment_status} />
+        </div>
+      ),
+    },
+    {
+      key: "total",
+      header: "Total",
+      align: "right",
+      className: "font-medium tabular-nums",
+      cell: (o) => formatMoney(o.total, o.currency),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      cell: (o) => (
+        <div className="flex flex-wrap gap-1">
+          {o.payment_status === "PENDING" &&
+            !["CANCELLED", "REFUNDED", "PAYMENT_FAILED"].includes(o.status) && (
+              <Button size="sm" loading={busy === o.id} onClick={() => markPaid(o.id)} className="h-8! px-3! text-xs">
+                Mark paid
+              </Button>
+            )}
+          {(NEXT[o.status] ?? []).map((next) => (
+            <Button
+              key={next}
+              size="sm"
+              variant="outline"
+              disabled={busy === o.id}
+              onClick={() => advance(o.id, next)}
+              className="h-8! px-3! text-xs"
+            >
+              {label(next)}
+            </Button>
+          ))}
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
-        {STATUSES.map((s) => (
-          <button
-            key={s || "all"}
-            onClick={() => setFilter(s)}
-            className={`focus-ring rounded-full border px-3 py-1 text-xs ${
-              filter === s ? "border-foreground bg-foreground text-background" : "border-border hover:bg-surface-2"
-            }`}
-          >
-            {s ? label(s) : "All"}
-          </button>
-        ))}
-      </div>
-
-      {!rows ? (
-        <Skeleton className="h-64" />
-      ) : rows.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-border p-10 text-center text-muted">
-          No orders.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="p-3">Order</th>
-                <th className="p-3">Customer</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Total</th>
-                <th className="p-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((o) => (
-                <tr key={o.id} className="border-t border-border">
-                  <td className="p-3">
-                    <p className="font-medium">{o.order_number}</p>
-                    <p className="text-xs text-muted">
-                      {new Date(o.created_at).toLocaleDateString("en-GB")} · {o.item_count} item{o.item_count === 1 ? "" : "s"}
-                    </p>
-                  </td>
-                  <td className="p-3 text-muted">{o.customer_email ?? "—"}</td>
-                  <td className="p-3">
-                    <div className="flex flex-col gap-1">
-                      <OrderStatusBadge status={o.status} />
-                      <PaymentStatusBadge status={o.payment_status} />
-                    </div>
-                  </td>
-                  <td className="p-3 text-right font-medium tabular-nums">
-                    {formatMoney(o.total, o.currency)}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex flex-wrap gap-1">
-                      {o.payment_status === "PENDING" &&
-                        !["CANCELLED", "REFUNDED", "PAYMENT_FAILED"].includes(o.status) && (
-                          <Button
-                            size="sm"
-                            disabled={busy === o.id}
-                            onClick={() => markPaid(o.id)}
-                            className="h-8! px-3! text-xs"
-                          >
-                            Mark paid
-                          </Button>
-                        )}
-                      {(NEXT[o.status] ?? []).map((next) => (
-                        <Button
-                          key={next}
-                          size="sm"
-                          variant="outline"
-                          disabled={busy === o.id}
-                          onClick={() => advance(o.id, next)}
-                          className="h-8! px-3! text-xs"
-                        >
-                          {label(next)}
-                        </Button>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <FilterChips
+        label="Filter by status"
+        value={filter}
+        onChange={setFilter}
+        options={STATUSES.map((s) => ({ value: s, label: s ? label(s) : "All" }))}
+      />
+      <DataTable
+        caption="Orders"
+        columns={columns}
+        rows={rows ?? []}
+        rowKey={(o) => o.id}
+        loading={!rows}
+        empty={
+          <EmptyState
+            compact
+            title="No orders"
+            description={filter ? "Nothing in this status right now." : "Orders will appear here as customers check out."}
+          />
+        }
+      />
     </div>
   );
 }
