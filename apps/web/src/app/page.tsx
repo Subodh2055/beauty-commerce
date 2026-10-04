@@ -66,7 +66,7 @@ function Hero() {
             AI-assisted fragrance finder coming soon
           </p>
           <h1
-            className="font-serif text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl animate-fade-up"
+            className="font-display text-4xl font-semibold leading-[1.05] tracking-display sm:text-5xl lg:text-6xl animate-fade-up"
             style={{ animationDelay: "140ms" }}
           >
             Scents and skincare,
@@ -101,7 +101,7 @@ function Hero() {
               fill
               priority
               sizes="50vw"
-              className="object-cover transition-transform duration-[3s] ease-out hover:scale-105"
+              className="object-cover transition-transform duration-[3s] ease-standard hover:scale-105"
             />
           </div>
         </div>
@@ -123,7 +123,7 @@ function CategoryTiles({ categories }: { categories: CategoryTree[] }) {
           <Reveal key={c.id} index={i} className="w-64 shrink-0 sm:w-auto">
             <Link
               href={`/categories/${c.slug}`}
-              className="group focus-ring relative block aspect-[4/3] overflow-hidden rounded-2xl bg-surface-2 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-lift"
+              className="group focus-ring relative block aspect-[4/3] overflow-hidden rounded-card bg-surface-2 shadow-soft transition-all duration-(--duration-base) hover:-translate-y-1 hover:shadow-lift"
             >
               {c.image_url && (
                 <Image
@@ -131,16 +131,16 @@ function CategoryTiles({ categories }: { categories: CategoryTree[] }) {
                   alt=""
                   fill
                   sizes="(min-width: 1024px) 20vw, (min-width: 640px) 33vw, 256px"
-                  className="object-cover transition-transform duration-700 ease-out group-hover:scale-110"
+                  className="object-cover transition-transform duration-(--duration-slower) ease-standard group-hover:scale-110"
                 />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
-              <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-white">
+              <div className="absolute inset-0 bg-gradient-to-t from-image-scrim/70 via-image-scrim/10 to-transparent" />
+              <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between text-on-image">
                 <span className="font-medium">{c.name}</span>
                 <ChevronIcon
                   width={18}
                   height={18}
-                  className="transition-transform duration-300 group-hover:translate-x-1"
+                  className="transition-transform duration-(--duration-base) group-hover:translate-x-1"
                 />
               </div>
             </Link>
@@ -175,7 +175,7 @@ function Section({
             <ChevronIcon
               width={16}
               height={16}
-              className="transition-transform duration-300 group-hover:translate-x-1"
+              className="transition-transform duration-(--duration-base) group-hover:translate-x-1"
             />
           </Link>
         </div>
@@ -193,7 +193,7 @@ function TrustBar() {
     ["Pay your way", "eSewa, Khalti, cards and cash on delivery."],
   ];
   return (
-    <section className="grid gap-4 rounded-3xl border border-border bg-gradient-to-br from-surface to-surface-2 p-6 shadow-soft sm:grid-cols-2 lg:grid-cols-4 lg:p-8">
+    <section className="grid gap-4 rounded-panel border border-border bg-gradient-to-br from-surface to-surface-2 p-6 shadow-soft sm:grid-cols-2 lg:grid-cols-4 lg:p-8">
       {items.map(([t, d], i) => (
         <Reveal key={t} index={i} className="space-y-1">
           <p className="flex items-center gap-2 font-medium">
