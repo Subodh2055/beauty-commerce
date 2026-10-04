@@ -11,6 +11,9 @@ import { PageHeader } from "@/components/catalog/page-header";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderStatusBadge, PaymentStatusBadge, label } from "@/components/order/status-badge";
+import { confirmDialog } from "@/components/ui/confirm";
+import { EmptyState } from "@/components/ui/empty-state";
+import { AlertIcon } from "@/components/ui/icons";
 
 const CANCELLABLE = new Set(["PENDING_PAYMENT", "PROCESSING"]);
 
@@ -48,7 +51,14 @@ export default function OrderDetailPage() {
   }, [ready, user, router, params.id]);
 
   async function onCancel() {
-    if (!confirm("Cancel this order? Stock will be released.")) return;
+    const ok = await confirmDialog({
+      title: "Cancel this order?",
+      description: "Your items will be released and any payment refunded.",
+      confirmLabel: "Cancel order",
+      cancelLabel: "Keep order",
+      tone: "danger",
+    });
+    if (!ok) return;
     setCancelling(true);
     try {
       setOrder(await cancel(params.id));
@@ -63,10 +73,12 @@ export default function OrderDetailPage() {
   if (error) {
     return (
       <div className="container-x py-10">
-        <div className="rounded-3xl border border-dashed border-border p-16 text-center">
-          <p className="mb-4 text-muted">{error}</p>
-          <ButtonLink href="/orders">Back to orders</ButtonLink>
-        </div>
+        <EmptyState
+          title="We couldn't open this order"
+          description={error}
+          icon={<AlertIcon width={26} height={26} />}
+          action={<ButtonLink href="/orders">Back to orders</ButtonLink>}
+        />
       </div>
     );
   }
@@ -83,7 +95,7 @@ export default function OrderDetailPage() {
   return (
     <div className="container-x py-10">
       {placed && (
-        <div className="mb-6 animate-fade-up rounded-2xl border border-success/30 bg-success/10 px-5 py-4 text-success">
+        <div className="mb-6 animate-fade-up rounded-card border border-success/30 bg-success/10 px-5 py-4 text-success">
           <p className="font-medium">Thank you! Your order is confirmed.</p>
           <p className="text-sm">Order {order.order_number} — we&apos;ll be in touch about delivery.</p>
         </div>
@@ -102,12 +114,12 @@ export default function OrderDetailPage() {
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <div className="space-y-6">
-          <section className="rounded-3xl border border-border bg-surface p-6 shadow-soft">
+          <section className="rounded-panel border border-border bg-surface p-6 shadow-soft">
             <h2 className="mb-4 font-serif text-lg font-semibold">Items</h2>
             <ul className="divide-y divide-border">
               {order.items.map((it, i) => (
                 <li key={i} className="flex gap-4 py-4">
-                  <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-surface-2">
+                  <div className="relative h-20 w-16 shrink-0 overflow-hidden rounded-control bg-surface-2">
                     {it.image_url && <Image src={it.image_url} alt="" fill sizes="64px" className="object-cover" />}
                   </div>
                   <div className="flex-1">
@@ -129,7 +141,7 @@ export default function OrderDetailPage() {
             </ul>
           </section>
 
-          <section className="rounded-3xl border border-border bg-surface p-6 shadow-soft">
+          <section className="rounded-panel border border-border bg-surface p-6 shadow-soft">
             <h2 className="mb-4 font-serif text-lg font-semibold">Timeline</h2>
             <ol className="space-y-4">
               {order.history.map((h, i) => (
@@ -149,7 +161,7 @@ export default function OrderDetailPage() {
         </div>
 
         <aside className="h-fit space-y-6">
-          <section className="rounded-3xl bg-surface-2 p-6">
+          <section className="rounded-panel bg-surface-2 p-6">
             <h2 className="mb-3 font-serif text-lg font-semibold">Summary</h2>
             <dl className="space-y-2 text-sm">
               <Row label="Subtotal" value={formatMoney(order.subtotal, order.currency)} />
@@ -162,7 +174,7 @@ export default function OrderDetailPage() {
             <p className="mt-3 text-xs text-muted">Payment: {label(order.payment_method)}</p>
           </section>
 
-          <section className="rounded-3xl border border-border bg-surface p-6 text-sm shadow-soft">
+          <section className="rounded-panel border border-border bg-surface p-6 text-sm shadow-soft">
             <h2 className="mb-2 font-serif text-lg font-semibold">Shipping to</h2>
             <p className="font-medium">{order.ship_recipient}</p>
             <p className="text-muted">{order.ship_phone}</p>

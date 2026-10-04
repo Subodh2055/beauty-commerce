@@ -20,6 +20,8 @@ import { AuthCard, FormError } from "@/components/auth/auth-card";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { AddressCard } from "@/components/account/address-form";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BagIcon } from "@/components/ui/icons";
 
 const FREE_SHIPPING_THRESHOLD = 5000;
 const SHIPPING_FEE = 150;
@@ -110,10 +112,12 @@ export default function CheckoutPage() {
     return (
       <div className="container-x py-10">
         <PageHeader title="Checkout" crumbs={[{ href: "/cart", label: "Bag" }, { href: "/checkout", label: "Checkout" }]} />
-        <div className="rounded-3xl border border-dashed border-border p-16 text-center">
-          <p className="mb-4 text-muted">Your bag is empty.</p>
-          <ButtonLink href="/products">Start shopping</ButtonLink>
-        </div>
+        <EmptyState
+          title="Your bag is empty"
+          description="Add something you love, then come back to check out."
+          icon={<BagIcon width={26} height={26} />}
+          action={<ButtonLink href="/products">Start shopping</ButtonLink>}
+        />
       </div>
     );
   }
@@ -178,7 +182,7 @@ export default function CheckoutPage() {
 
       <form onSubmit={onSubmit} className="grid gap-8 lg:grid-cols-[1fr_380px]">
         <div className="space-y-8">
-          <section className="space-y-4 rounded-3xl border border-border bg-surface p-6 shadow-soft">
+          <section className="space-y-4 rounded-panel border border-border bg-surface p-6 shadow-soft">
             <h2 className="font-serif text-lg font-semibold">Shipping address</h2>
             <FormError message={error} />
 
@@ -196,7 +200,7 @@ export default function CheckoutPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedId("new")}
-                  className={`focus-ring rounded-2xl border border-dashed p-4 text-left text-sm transition-colors ${
+                  className={`focus-ring rounded-card border border-dashed p-4 text-left text-sm transition-colors ${
                     usingSaved ? "border-border text-muted hover:border-foreground/30" : "border-accent bg-accent-soft/40 text-foreground"
                   }`}
                 >
@@ -221,13 +225,13 @@ export default function CheckoutPage() {
             <Field label="Order note" name="customer_note" placeholder="Delivery instructions (optional)" />
           </section>
 
-          <section className="space-y-3 rounded-3xl border border-border bg-surface p-6 shadow-soft">
+          <section className="space-y-3 rounded-panel border border-border bg-surface p-6 shadow-soft">
             <h2 className="font-serif text-lg font-semibold">Payment</h2>
             <div className="space-y-2">
               {PAYMENT_METHODS.map((m) => (
                 <label
                   key={m.value}
-                  className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 transition-colors ${
+                  className={`flex cursor-pointer items-center gap-3 rounded-card border p-4 transition-colors ${
                     method === m.value ? "border-accent bg-accent-soft/50" : "border-border"
                   } ${!m.available ? "cursor-not-allowed opacity-55" : ""}`}
                 >
@@ -238,7 +242,7 @@ export default function CheckoutPage() {
                     checked={method === m.value}
                     disabled={!m.available}
                     onChange={() => setMethod(m.value)}
-                    className="h-4 w-4 accent-[var(--accent)]"
+                    className="h-4 w-4 accent-accent"
                   />
                   <span className="flex-1">
                     <span className="font-medium">{m.label}</span>
@@ -250,14 +254,14 @@ export default function CheckoutPage() {
           </section>
         </div>
 
-        <aside className="h-fit space-y-4 rounded-3xl bg-surface-2 p-6 lg:sticky lg:top-24">
+        <aside className="h-fit space-y-4 rounded-panel bg-surface-2 p-6 lg:sticky lg:top-24">
           <h2 className="font-serif text-lg font-semibold">Your order</h2>
           <ul className="space-y-3">
             {cart.map((l) => (
               <li key={l.variantId} className="flex gap-3">
                 <div className="relative h-14 w-12 shrink-0 overflow-hidden rounded-lg bg-surface">
                   {l.imageUrl && <Image src={l.imageUrl} alt="" fill sizes="48px" className="object-cover" />}
-                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-bold text-accent-foreground">
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-2xs font-bold text-accent-foreground">
                     {l.quantity}
                   </span>
                 </div>
@@ -277,7 +281,7 @@ export default function CheckoutPage() {
                 value={couponInput}
                 onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                 placeholder="Coupon code"
-                className="focus-ring h-10 flex-1 rounded-xl border border-border bg-surface px-3 text-sm uppercase placeholder:normal-case placeholder:text-muted"
+                className="focus-ring h-10 flex-1 rounded-control border border-border-strong bg-surface px-3 text-sm uppercase placeholder:normal-case placeholder:text-muted"
               />
               <Button type="button" variant="outline" onClick={applyCoupon} disabled={couponBusy}>
                 {couponBusy ? "…" : coupon ? "Update" : "Apply"}
