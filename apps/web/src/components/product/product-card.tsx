@@ -20,7 +20,7 @@ export function ProductCard({
     <article className="group relative flex flex-col">
       <Link
         href={href}
-        className="focus-ring relative block aspect-[4/5] overflow-hidden rounded-2xl bg-surface-2 shadow-soft transition-all duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-lift"
+        className="focus-ring relative block aspect-[4/5] overflow-hidden rounded-card bg-surface-2 shadow-soft transition-all duration-(--duration-base) ease-standard group-hover:-translate-y-1.5 group-hover:shadow-lift"
       >
         {img ? (
           <Image
@@ -29,7 +29,7 @@ export function ProductCard({
             fill
             sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
             priority={priority}
-            className="object-cover transition-transform duration-700 ease-out group-hover:scale-[1.07]"
+            className="object-cover transition-transform duration-(--duration-slower) ease-standard group-hover:scale-[1.07]"
           />
         ) : (
           <div className="flex h-full items-center justify-center text-muted">
@@ -44,7 +44,7 @@ export function ProductCard({
       </Link>
 
       <WishlistButton
-        className="absolute right-3 top-3 h-9 w-9 bg-surface/90 shadow-sm backdrop-blur"
+        className="absolute right-3 top-3 h-9 w-9 bg-surface/90 shadow-hairline backdrop-blur"
         item={{
           productId: product.id,
           slug: product.slug,

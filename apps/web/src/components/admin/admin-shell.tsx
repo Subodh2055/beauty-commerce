@@ -55,7 +55,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`focus-ring shrink-0 rounded-xl px-3 py-2 text-sm transition-colors ${
+                className={`focus-ring shrink-0 rounded-control px-3 py-2 text-sm transition-colors ${
                   active ? "bg-accent text-accent-foreground" : "hover:bg-surface-2"
                 }`}
               >

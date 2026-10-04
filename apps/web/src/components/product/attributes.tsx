@@ -28,7 +28,7 @@ export function NotePyramid({ attributes }: { attributes: Attrs }) {
         {rows.map((k, i) => (
           <li
             key={k}
-            className="flex gap-4 rounded-2xl bg-surface-2 p-4"
+            className="flex gap-4 rounded-card bg-surface-2 p-4"
             style={{ marginInline: `${i * 6}%` }}
           >
             <span className="w-14 shrink-0 text-xs font-semibold uppercase tracking-wider text-muted">

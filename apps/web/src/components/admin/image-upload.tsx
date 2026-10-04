@@ -41,11 +41,11 @@ export function ImageUpload({
 
   return (
     <div className="flex items-center gap-3">
-      <div className={`relative ${aspect} w-16 shrink-0 overflow-hidden rounded-xl border border-border bg-surface-2`}>
+      <div className={`relative ${aspect} w-16 shrink-0 overflow-hidden rounded-control border border-border bg-surface-2`}>
         {value ? (
           <Image src={value} alt="" fill sizes="64px" className="object-cover" />
         ) : (
-          <span className="flex h-full items-center justify-center text-[10px] text-muted">
+          <span className="flex h-full items-center justify-center text-2xs text-muted">
             none
           </span>
         )}

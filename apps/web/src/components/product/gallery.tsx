@@ -10,7 +10,7 @@ export function Gallery({ images, name }: { images: ProductImage[]; name: string
 
   if (!current) {
     return (
-      <div className="flex aspect-[4/5] items-center justify-center rounded-3xl bg-surface-2 text-muted">
+      <div className="flex aspect-[4/5] items-center justify-center rounded-panel bg-surface-2 text-muted">
         No image
       </div>
     );
@@ -18,7 +18,7 @@ export function Gallery({ images, name }: { images: ProductImage[]; name: string
 
   return (
     <div className="flex flex-col gap-3 lg:flex-row-reverse">
-      <div className="relative aspect-[4/5] flex-1 overflow-hidden rounded-3xl bg-surface-2">
+      <div className="relative aspect-[4/5] flex-1 overflow-hidden rounded-panel bg-surface-2">
         <Image
           key={current.id}
           src={current.url}
@@ -41,7 +41,7 @@ export function Gallery({ images, name }: { images: ProductImage[]; name: string
                 onClick={() => setActive(i)}
                 aria-label={`Show image ${i + 1}`}
                 aria-current={i === active}
-                className={`focus-ring relative block h-20 w-16 overflow-hidden rounded-xl border-2 transition-colors ${
+                className={`focus-ring relative block h-20 w-16 overflow-hidden rounded-control border-2 transition-colors ${
                   i === active ? "border-accent" : "border-transparent hover:border-border"
                 }`}
               >

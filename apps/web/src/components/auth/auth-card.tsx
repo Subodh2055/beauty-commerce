@@ -20,7 +20,7 @@ export function AuthCard({
             Beauty<span className="text-accent">.</span>
           </Link>
         </div>
-        <div className="rounded-3xl border border-border bg-surface p-8 shadow-soft">
+        <div className="rounded-panel border border-border bg-surface p-8 shadow-soft">
           <h1 className="font-serif text-2xl font-semibold">{title}</h1>
           {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
           <div className="mt-6">{children}</div>
@@ -36,7 +36,7 @@ export function FormError({ message }: { message: string | null }) {
   return (
     <p
       role="alert"
-      className="rounded-xl border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-danger"
+      className="rounded-control border border-danger/30 bg-danger/10 px-3.5 py-2.5 text-sm text-danger"
     >
       {message}
     </p>

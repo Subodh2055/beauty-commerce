@@ -49,7 +49,7 @@ export default function AdminDashboard() {
       {cards.map((c) => (
         <div
           key={c.label}
-          className={`rounded-2xl border p-6 shadow-soft ${
+          className={`rounded-card border p-6 shadow-soft ${
             c.accent ? "border-accent/30 bg-accent-soft/40" : "border-border bg-surface"
           }`}
         >
