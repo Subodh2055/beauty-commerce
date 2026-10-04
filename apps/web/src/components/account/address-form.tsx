@@ -61,7 +61,7 @@ export function AddressForm({
         <Field label="Postal code" name="postal_code" defaultValue={initial?.postal_code ?? ""} />
       </div>
       <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" name="is_default" defaultChecked={initial?.is_default ?? false} className="h-4 w-4 accent-[var(--accent)]" />
+        <input type="checkbox" name="is_default" defaultChecked={initial?.is_default ?? false} className="h-4 w-4 accent-accent" />
         Set as default address
       </label>
       <div className="flex gap-2">
@@ -100,7 +100,7 @@ export function AddressCard({
       <div className="flex items-center justify-between gap-2">
         <span className="font-medium">{address.label}</span>
         {address.is_default && (
-          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">
+          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-2xs font-semibold text-accent">
             Default
           </span>
         )}
@@ -119,7 +119,7 @@ export function AddressCard({
       <button
         type="button"
         onClick={onSelect}
-        className={`focus-ring w-full rounded-2xl border p-4 text-left transition-colors ${
+        className={`focus-ring w-full rounded-card border p-4 text-left transition-colors ${
           selected ? "border-accent bg-accent-soft/40" : "border-border hover:border-foreground/30"
         }`}
       >
@@ -129,7 +129,7 @@ export function AddressCard({
   }
 
   return (
-    <div className="rounded-2xl border border-border bg-surface p-4 shadow-soft">
+    <div className="rounded-card border border-border bg-surface p-4 shadow-soft">
       {inner}
       <div className="mt-3 flex flex-wrap gap-3 text-sm">
         {!address.is_default && onSetDefault && (

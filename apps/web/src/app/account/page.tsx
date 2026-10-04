@@ -44,7 +44,7 @@ export default function AccountPage() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2 space-y-6">
-          <div className="flex items-center gap-4 rounded-3xl border border-border bg-surface p-6 shadow-soft">
+          <div className="flex items-center gap-4 rounded-panel border border-border bg-surface p-6 shadow-soft">
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-accent-soft font-serif text-xl font-semibold text-accent">
               {initials}
             </div>
@@ -71,13 +71,13 @@ export default function AccountPage() {
             <Tile href="/products" title="Keep shopping" desc="Browse the catalogue." />
           </div>
 
-          <div className="rounded-3xl border border-border bg-surface p-6 shadow-soft">
+          <div className="rounded-panel border border-border bg-surface p-6 shadow-soft">
             <h2 className="mb-4 font-serif text-lg font-semibold">Address book</h2>
             <AddressBook />
           </div>
         </section>
 
-        <aside className="h-fit space-y-3 rounded-3xl border border-border bg-surface-2 p-6">
+        <aside className="h-fit space-y-3 rounded-panel border border-border bg-surface-2 p-6">
           <h2 className="font-medium">Session</h2>
           <p className="text-sm text-muted">
             Signed in on this device. Signing out revokes this session&apos;s refresh token.
@@ -104,7 +104,7 @@ function Tile({ href, title, desc }: { href: string; title: string; desc: string
   return (
     <Link
       href={href}
-      className="group focus-ring rounded-2xl border border-border bg-surface p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-lift"
+      className="group focus-ring rounded-card border border-border bg-surface p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-lift"
     >
       <p className="font-medium group-hover:text-accent">{title}</p>
       <p className="mt-1 text-sm text-muted">{desc}</p>
@@ -135,7 +135,7 @@ function VerifyEmailBadge() {
         type="button"
         onClick={resend}
         disabled={busy}
-        className="focus-ring rounded text-[11px] font-medium text-accent underline-offset-2 hover:underline disabled:opacity-50"
+        className="focus-ring rounded text-2xs font-medium text-accent underline-offset-2 hover:underline disabled:opacity-50"
       >
         {busy ? "Sending…" : "Resend"}
       </button>
