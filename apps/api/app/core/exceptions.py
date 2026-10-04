@@ -10,6 +10,7 @@ Every error response has the same shape:
 from typing import Any
 
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -93,12 +94,15 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+        # Error ctx can hold Decimals (`le=100`) and exception objects (model
+        # validators); encode them or the 422 itself fails as a 500.
+        details = jsonable_encoder(exc.errors(), custom_encoder={BaseException: str})
         return _error_response(
             request,
             status.HTTP_422_UNPROCESSABLE_CONTENT,
             "validation_error",
             "Request validation failed",
-            exc.errors(),
+            details,
         )
 
     @app.exception_handler(StarletteHTTPException)
