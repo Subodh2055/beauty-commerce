@@ -128,3 +128,32 @@ export const TiktokIcon = (p: P) => (
     <path d="M15 4c.5 2 2 3.5 4 3.8V11c-1.6 0-3-.5-4-1.3V15a5 5 0 1 1-5-5v3a2 2 0 1 0 2 2V4h3Z" />
   </svg>
 );
+
+export const CheckIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </svg>
+);
+
+export const AlertIcon = (p: P) => (
+  <svg {...d(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7.5v5.5M12 16.5h.01" />
+  </svg>
+);
+
+export const InfoIcon = (p: P) => (
+  <svg {...d(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 11v5.5M12 7.5h.01" />
+  </svg>
+);
+
+/** Empty-state default: a perfume bottle. */
+export const BottleIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M10 3h4v3h-4zM9 6h6l1 3H8l1-3Z" />
+    <rect x="6" y="9" width="12" height="12" rx="3" />
+    <path d="M9.5 14h5" />
+  </svg>
+);
