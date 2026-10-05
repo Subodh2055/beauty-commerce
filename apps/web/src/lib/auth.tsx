@@ -30,6 +30,7 @@ export interface AuthUser {
   id: string;
   email: string;
   full_name: string | null;
+  phone?: string | null;
   is_email_verified: boolean;
   roles: string[];
 }
@@ -202,6 +203,12 @@ const actions = {
     setSession({ ...s, ...t, session_started_at: sessionStartedAt(t.access_token) });
   },
 
+  /** Swap in a fresh user record (after a profile edit) without touching tokens. */
+  setUser(user: AuthUser) {
+    const s = getSnapshot().session;
+    if (s) setSession({ ...s, user });
+  },
+
   /** Drop the session locally, recording why (drives the login-page notice). */
   expire(reason: LogoutReason) {
     endSession(reason);
@@ -254,6 +261,7 @@ export interface AuthApi {
   sessionStartedAt: number | null;
   refreshTokens: typeof actions.refreshTokens;
   expire: typeof actions.expire;
+  setUser: typeof actions.setUser;
   accessToken: string | null;
   register: typeof actions.register;
   login: typeof actions.login;
@@ -348,6 +356,17 @@ export interface OrderDetail {
   created_at: string;
   items: OrderItem[];
   history: OrderStatusEvent[];
+  /** One per seller; tracking lives here. */
+  shipments: Shipment[];
+}
+
+export interface Shipment {
+  id: string;
+  seller_name: string | null;
+  status: string;
+  tracking_number: string | null;
+  shipped_at: string | null;
+  delivered_at: string | null;
 }
 
 export interface OrderSummary {
@@ -865,5 +884,73 @@ export function useOrders() {
       const res = await authFetch(`/orders/${id}/cancel`, { method: "POST" });
       return readJson<OrderDetail>(res);
     },
+  };
+}
+
+/* ---------- Profile & my reviews ---------- */
+
+export interface MyReview {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string | null;
+  is_verified_purchase: boolean;
+  created_at: string;
+  updated_at: string;
+  product: { name: string; slug: string; image_url: string | null };
+}
+
+export function useAccount() {
+  const { authFetch, setUser } = useAuth();
+  return {
+    async updateProfile(body: { full_name: string; phone: string | null }): Promise<AuthUser> {
+      const user = await readJson<AuthUser>(
+        await authFetch("/users/me", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      );
+      setUser(user);
+      return user;
+    },
+    myReviews: () => authFetch("/users/me/reviews").then((r) => readJson<MyReview[]>(r)),
+  };
+}
+
+/* ---------- Payments ---------- */
+
+export interface PaymentMethodOption {
+  method: "COD" | "ESEWA" | "KHALTI" | "STRIPE";
+  label: string;
+  description: string;
+  available: boolean;
+  /** Hands the shopper to the provider's hosted page after placing the order. */
+  online: boolean;
+}
+
+export interface StubPayment {
+  provider_ref: string;
+  order_id: string;
+  order_number: string;
+  amount: string;
+  currency: string;
+  status: string;
+}
+
+export function usePayments() {
+  const { authFetch } = useAuth();
+  return {
+    methods: () => authFetch("/payments/methods").then((r) => readJson<PaymentMethodOption[]>(r)),
+    stub: (ref: string) =>
+      authFetch(`/payments/stub?ref=${encodeURIComponent(ref)}`).then((r) =>
+        readJson<StubPayment>(r),
+      ),
+    completeStub: (ref: string, succeeded: boolean) =>
+      authFetch("/payments/stub/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider_ref: ref, succeeded }),
+      }).then((r) => readJson<{ order_id: string; outcome: string }>(r)),
   };
 }
