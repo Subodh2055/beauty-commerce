@@ -91,7 +91,7 @@ async def test_vendor_profile_self_service(api: AsyncClient, db) -> None:
 async def test_applications_can_be_closed(api: AsyncClient, db) -> None:
     root = await make_user(db, "SUPER_ADMIN")
     await api.patch(
-        "/api/v1/admin/settings", json={"vendor_applications_open": False}, headers=auth(root)
+        "/api/v1/super-admin/settings", json={"vendor_applications_open": False}, headers=auth(root)
     )
     res = await api.post(
         "/api/v1/vendors/apply", json=APPLICATION, headers=auth(await make_user(db))
@@ -109,11 +109,11 @@ async def test_vendor_admin_requires_permission(api: AsyncClient, db) -> None:
 
 async def test_settings_defaults_update_and_public_view(api: AsyncClient, db) -> None:
     root = await make_user(db, "SUPER_ADMIN")
-    defaults = (await api.get("/api/v1/admin/settings", headers=auth(root))).json()
+    defaults = (await api.get("/api/v1/super-admin/settings", headers=auth(root))).json()
     assert defaults["default_commission_rate"] == "15.00"
 
     res = await api.patch(
-        "/api/v1/admin/settings",
+        "/api/v1/super-admin/settings",
         json={"default_commission_rate": "12.5", "shipping_fee": "200"},
         headers=auth(root),
     )
@@ -124,7 +124,7 @@ async def test_settings_defaults_update_and_public_view(api: AsyncClient, db) ->
     assert "default_commission_rate" not in public
 
     bad = await api.patch(
-        "/api/v1/admin/settings", json={"default_commission_rate": "150"}, headers=auth(root)
+        "/api/v1/super-admin/settings", json={"default_commission_rate": "150"}, headers=auth(root)
     )
     assert bad.status_code == 422
 

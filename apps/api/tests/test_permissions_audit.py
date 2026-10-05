@@ -39,7 +39,7 @@ def _calls(dependant):
 def test_every_admin_and_vendor_mutation_is_audited_and_permissioned() -> None:
     checked = 0
     for path, route in _routes():
-        if not (path.startswith("/api/v1/admin") or path.startswith("/api/v1/vendor/")):
+        if not path.startswith(("/api/v1/admin", "/api/v1/super-admin", "/api/v1/vendor/")):
             continue
         calls = list(_calls(route.dependant))
         perms = [getattr(c, "required_permission", None) for c in calls]
@@ -51,14 +51,22 @@ def test_every_admin_and_vendor_mutation_is_audited_and_permissioned() -> None:
 
 
 def test_permission_check_in_memory() -> None:
-    perm = PermissionRow(code="catalog.manage")
+    perm = PermissionRow(code="products.edit")
     staff = User(email="s@example.com", roles=[Role(name="STAFF", permissions=[])])
     admin = User(email="a@example.com", roles=[Role(name="ADMIN", permissions=[perm])])
     root = User(email="r@example.com", roles=[Role(name="SUPER_ADMIN", permissions=[])])
-    assert not staff.has_permission("catalog.manage")
-    assert admin.has_permission("catalog.manage")
+    assert not staff.has_permission("products.edit")
+    assert admin.has_permission("products.edit")
     # SUPER_ADMIN passes even for permissions it has no row for.
     assert root.has_permission("anything.new")
+
+
+def test_super_admin_only_codes_never_leak_to_other_roles() -> None:
+    # Even a hand-inserted grant row doesn't give a non-super-admin these.
+    rogue = Role(name="ROGUE", permissions=[PermissionRow(code="audit.view")])
+    user = User(email="x@example.com", roles=[rogue])
+    assert not user.has_permission("audit.view")
+    assert "audit.view" not in user.permission_codes
 
 
 # --- seeded grants -----------------------------------------------------------------
@@ -75,8 +83,8 @@ async def test_seeded_grants_enforced_over_http(api: AsyncClient, db) -> None:
     assert (await api.get("/api/v1/admin/products", headers=auth(staff))).status_code == 403
     # Admin: catalog yes, platform settings no (super admin only).
     assert (await api.get("/api/v1/admin/products", headers=auth(admin))).status_code == 200
-    assert (await api.get("/api/v1/admin/settings", headers=auth(admin))).status_code == 403
-    assert (await api.get("/api/v1/admin/settings", headers=auth(root))).status_code == 200
+    assert (await api.get("/api/v1/super-admin/settings", headers=auth(admin))).status_code == 403
+    assert (await api.get("/api/v1/super-admin/settings", headers=auth(root))).status_code == 200
     # Customers get nothing in /admin.
     customer = await make_user(db)
     assert (await api.get("/api/v1/admin/stats", headers=auth(customer))).status_code == 403
@@ -113,14 +121,17 @@ async def test_admin_changes_are_logged_with_a_diff(api: AsyncClient, db) -> Non
     assert update.changes["name"] == ["Audit Maison", "Audit Maison II"]
     assert update.changes["country"] == [None, "FR"]
 
-    # Readable through the API by anyone with audit.read…
+    # Readable through the API by the super admin only…
+    root = await make_user(db, "SUPER_ADMIN")
     res = await api.get(
-        "/api/v1/admin/audit-logs", params={"entity_id": brand_id}, headers=auth(admin)
+        "/api/v1/super-admin/audit-logs", params={"entity_id": brand_id}, headers=auth(root)
     )
     assert res.status_code == 200 and res.json()["total"] == 2
-    # …but not by staff.
+    # …not by the admin who made the change, nor by staff.
     staff = await make_user(db, "STAFF")
-    assert (await api.get("/api/v1/admin/audit-logs", headers=auth(staff))).status_code == 403
+    for who in (admin, staff):
+        res = await api.get("/api/v1/super-admin/audit-logs", headers=auth(who))
+        assert res.status_code == 403
 
 
 @pytest.mark.db
