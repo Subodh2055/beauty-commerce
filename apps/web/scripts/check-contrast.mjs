@@ -12,16 +12,23 @@ import { readFileSync } from "node:fs";
 
 const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8");
 
+// Every `selector {` block merged (globals.css has several :root blocks: light
+// colours, fixed colours that don't change with the theme, motion).
 function block(selector) {
-  const start = css.indexOf(`${selector} {`);
-  if (start < 0) throw new Error(`No ${selector} block in globals.css`);
-  const body = css.slice(start, css.indexOf("}", start));
-  return Object.fromEntries(
-    [...body.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\b/gi)].map((m) => [m[1], m[2]]),
-  );
+  const out = {};
+  let at = css.indexOf(`${selector} {`);
+  if (at < 0) throw new Error(`No ${selector} block in globals.css`);
+  while (at >= 0) {
+    const body = css.slice(at, css.indexOf("}", at));
+    for (const m of body.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\b/gi)) out[m[1]] = m[2];
+    at = css.indexOf(`${selector} {`, at + 1);
+  }
+  return out;
 }
 
-const themes = { light: block(":root"), dark: block(":root.dark") };
+const light = block(":root");
+// Dark overrides the light values; fixed tokens carry over unchanged.
+const themes = { light, dark: { ...light, ...block(":root.dark") } };
 
 function luminance(hex) {
   const [r, g, b] = [1, 3, 5].map((i) => {
@@ -57,6 +64,9 @@ const pairs = [
   ["foreground", "nude", TEXT, "nude panels"],
   ["foreground", "blush", TEXT, "blush tiles"],
   ["success", "success-soft", TEXT, "success badge / toast"],
+  ...["chart-1", "chart-2", "chart-3"].flatMap((c) =>
+    ["background", "surface", "surface-2"].map((s) => [c, s, UI, "chart series"]),
+  ),
   ["success", "surface", TEXT, "in-stock text"],
   ["warning", "warning-soft", TEXT, "warning badge"],
   ["danger", "danger-soft", TEXT, "error badge / toast"],
@@ -66,6 +76,13 @@ const pairs = [
   ...["background", "surface", "surface-2"].map((s) => ["ring", s, UI, "focus ring"]),
   ...["background", "surface"].map((s) => ["gold", s, UI, "rating stars"]),
   ["primary", "background", UI, "primary button edge"],
+  // Landing page
+  ["on-image", "ink-fixed", TEXT, "brand story text"],
+  ["champagne-fixed", "ink-fixed", TEXT, "brand story kickers"],
+  ["muted", "gold-soft", TEXT, "vendor CTA copy"],
+  ["accent", "gold-soft", TEXT, "vendor CTA eyebrow"],
+  ["muted", "background-tint", TEXT, "notes / reviews bands"],
+  ["accent", "background-tint", TEXT, "band eyebrows"],
 ];
 
 let failures = 0;
