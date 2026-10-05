@@ -22,6 +22,7 @@ from app.modules.cms.models import Banner
 from app.modules.coupons.models import Coupon, CouponUsage
 from app.modules.inventory.models import InventoryTransaction
 from app.modules.media.models import MediaAsset
+from app.modules.newsletter.models import NewsletterSubscriber
 from app.modules.notifications.models import Notification
 from app.modules.orders.models import Order, OrderItem, OrderStatusHistory, Payment, VendorOrder
 from app.modules.payments.models import PaymentEvent
@@ -63,6 +64,7 @@ __all__ = [
     "SupportTicket",
     "TicketMessage",
     "MediaAsset",
+    "NewsletterSubscriber",
     "Review",
     "Coupon",
     "CouponUsage",
