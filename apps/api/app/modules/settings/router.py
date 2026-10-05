@@ -13,9 +13,7 @@ from app.shared.enums import Permission
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
 public_router = APIRouter()
-admin_router = APIRouter(
-    dependencies=[Depends(require_permission(Permission.SETTINGS_MANAGE)), Audited]
-)
+admin_router = APIRouter(dependencies=[Audited])
 
 
 @public_router.get("/public", response_model=PublicSettings, summary="Storefront settings")
@@ -23,11 +21,21 @@ async def public_settings(db: DbSession) -> PublicSettings:
     return await service.public_settings(db)
 
 
-@admin_router.get("", response_model=PlatformSettings, summary="All platform settings")
+@admin_router.get(
+    "",
+    response_model=PlatformSettings,
+    summary="All platform settings",
+    dependencies=[Depends(require_permission(Permission.SETTINGS_VIEW))],
+)
 async def get_settings(db: DbSession) -> PlatformSettings:
     return await service.get_settings(db)
 
 
-@admin_router.patch("", response_model=PlatformSettings, summary="Change platform settings")
+@admin_router.patch(
+    "",
+    response_model=PlatformSettings,
+    summary="Change platform settings",
+    dependencies=[Depends(require_permission(Permission.SETTINGS_EDIT))],
+)
 async def update_settings(body: PlatformSettingsUpdate, db: DbSession) -> PlatformSettings:
     return await service.update_settings(db, body)
