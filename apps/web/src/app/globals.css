@@ -48,6 +48,12 @@
   --danger-foreground: #ffffff;
   --danger-soft: #fbe6e3;
 
+  /* Charts: Okabe–Ito hues (distinguishable with every common colour-vision
+     deficiency); series also differ by shape, never by colour alone. 3:1+ on surfaces. */
+  --chart-1: #0072b2; /* blue */
+  --chart-2: #d55e00; /* vermillion */
+  --chart-3: #00866b; /* bluish green */
+
   --ring: #9a3f58;
   --scrim: 23 21 31; /* overlay base, rgb triplet */
   --shadow-color: 23 21 31;
@@ -89,6 +95,10 @@
   --danger-foreground: #17151f;
   --danger-soft: #36191a;
 
+  --chart-1: #56b4e9; /* sky blue */
+  --chart-2: #e69f00; /* orange */
+  --chart-3: #3fc29b; /* bluish green */
+
   --ring: #d9be8a;
   --scrim: 0 0 0;
   --shadow-color: 0 0 0;
@@ -98,6 +108,9 @@
 :root {
   --image-scrim: 23 21 31; /* ink; 70% keeps white text >= 4.5:1 over any photo */
   --on-image: #ffffff;
+  /* Cinematic bands (landing brand story) are ink in both themes. */
+  --ink-fixed: #17151f;
+  --champagne-fixed: #d9be8a;
 }
 
 /* --- Motion tokens (plain vars: Tailwind has no duration namespace) ------- */
@@ -128,6 +141,9 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-soft: var(--accent-soft);
   --color-gold: var(--gold);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
   --color-gold-strong: var(--gold-strong);
   --color-gold-soft: var(--gold-soft);
   --color-nude: var(--nude);
@@ -143,6 +159,8 @@
   --color-scrim: rgb(var(--scrim));
   --color-image-scrim: rgb(var(--image-scrim));
   --color-on-image: var(--on-image);
+  --color-ink-fixed: var(--ink-fixed);
+  --color-champagne-fixed: var(--champagne-fixed);
 
   /* Cormorant Garamond for display, Inter for everything you read. */
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
@@ -292,6 +310,10 @@
 html {
   scroll-behavior: smooth;
 }
+/* Lenis (landing page) does its own smoothing; native smoothing would fight it. */
+html.lenis {
+  scroll-behavior: auto;
+}
 
 body {
   background: var(--background);
@@ -391,6 +413,88 @@ body {
   }
 }
 
+/* --- Landing page ------------------------------------------------------------
+   The hero reveal is CSS, not JS: it starts from the server HTML on first paint,
+   so the headline (the LCP element) never waits for hydration. Everything here
+   animates transform/opacity only. */
+/* Transform only, never opacity: the headline is the LCP element, and Chrome
+   ignores invisible text for LCP, so a fade would hold LCP back until the
+   animation's frames run (behind hydration on slow phones). */
+@keyframes word-rise {
+  from {
+    transform: translateY(0.4em) rotate(1.2deg);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes mist-drift {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.9);
+  }
+  20%,
+  80% {
+    opacity: var(--mist-o, 0.5);
+  }
+  50% {
+    transform: translate3d(var(--mist-x, 24px), -60px, 0) scale(1.15);
+  }
+}
+@keyframes scroll-cue {
+  0% {
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+  45% {
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+  55% {
+    transform: scaleY(1);
+    transform-origin: bottom;
+  }
+  100% {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
+}
+
+@layer utilities {
+  .hero-word {
+    display: inline-block;
+    /* Short stagger: the headline is the LCP element, so it must land fast. */
+    animation: word-rise 0.7s var(--ease-luxe) both;
+    animation-delay: calc(40ms + var(--i, 0) * 35ms);
+  }
+  .hero-fade {
+    animation: fade-up var(--duration-slower) var(--ease-luxe) both;
+    animation-delay: var(--d, 0ms);
+  }
+  .mist {
+    animation: mist-drift var(--mist-t, 14s) ease-in-out infinite;
+    animation-delay: var(--mist-d, 0s);
+  }
+  .scroll-cue {
+    animation: scroll-cue 2.4s var(--ease-standard) infinite;
+  }
+
+  /* Testimonials marquee: pauses on hover/focus so it can be read. */
+  .marquee:hover .marquee-track,
+  .marquee:focus-within .marquee-track {
+    animation-play-state: paused;
+  }
+
+  /* Brand story: chapters stack only once the pinned scene is active (JS + motion OK). */
+  .story-active .story-stack {
+    display: grid;
+  }
+  .story-active .story-stack > * {
+    grid-area: 1 / 1;
+  }
+}
+
 /* --- Reduced motion ---------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   html {
@@ -406,5 +510,67 @@ body {
   .reveal {
     opacity: 1;
     transform: none;
+  }
+  .mist {
+    display: none;
+  }
+  /* A still marquee becomes a scrollable row; the duplicate copy goes. */
+  .marquee {
+    overflow-x: auto;
+  }
+  .marquee-track {
+    animation: none !important;
+  }
+  .marquee-dup {
+    display: none;
+  }
+}
+
+/* ---------- View transitions (route changes, product image morph) ---------- */
+/* Clicks pass through the transition overlay to the live page. */
+::view-transition {
+  pointer-events: none;
+}
+/* The header is the spatial anchor: it never animates between pages. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+/* Exits are quicker than entries; the new page waits for the old to clear. */
+::view-transition-old(.page-exit) {
+  animation: vt-fade var(--duration-exit) var(--ease-exit) both reverse;
+}
+::view-transition-new(.page-enter) {
+  animation:
+    vt-fade 240ms var(--ease-standard) var(--duration-exit) both,
+    vt-rise 420ms var(--ease-luxe) both;
+}
+/* Product card image → product page gallery. */
+::view-transition-group(.morph) {
+  animation-duration: 420ms;
+  animation-timing-function: var(--ease-luxe);
+}
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise {
+  from {
+    transform: translateY(12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
