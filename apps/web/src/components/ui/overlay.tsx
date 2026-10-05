@@ -6,6 +6,8 @@
  *   (the sticky header) can't trap `position: fixed`;
  * - Esc closes, Tab is trapped inside, focus returns to the opener on close;
  * - body scroll is locked (ref-counted, so stacked overlays don't fight);
+ * - when overlays stack (a confirm over a drawer), only the topmost one
+ *   handles Esc and Tab, so Esc closes one layer at a time;
  * - stays mounted briefly after close so it can animate out (exit < enter).
  */
 
@@ -43,6 +45,9 @@ export function usePresence(open: boolean) {
   return { mounted, closing: mounted && !open };
 }
 
+/** Open overlays, oldest first; only the last one reacts to the keyboard. */
+const stack: symbol[] = [];
+
 let scrollLocks = 0;
 let savedOverflow = "";
 let savedPadding = "";
@@ -79,6 +84,8 @@ export function useOverlay(
   useEffect(() => {
     if (!open) return;
     const opener = document.activeElement as HTMLElement | null;
+    const me = Symbol("overlay");
+    stack.push(me);
     lockScroll();
 
     // Initial focus: the element marked [data-autofocus], else the first
@@ -91,6 +98,7 @@ export function useOverlay(
     target?.focus({ preventScroll: true });
 
     function onKeyDown(e: KeyboardEvent) {
+      if (stack[stack.length - 1] !== me) return; // a newer overlay is on top
       if (e.key === "Escape" && dismissible) {
         e.stopPropagation();
         onCloseRef.current();
@@ -118,6 +126,7 @@ export function useOverlay(
     document.addEventListener("keydown", onKeyDown);
     return () => {
       document.removeEventListener("keydown", onKeyDown);
+      stack.splice(stack.indexOf(me), 1);
       unlockScroll();
       // Return focus to whatever opened the overlay, if it's still on the page.
       if (opener && document.contains(opener)) opener.focus({ preventScroll: true });
