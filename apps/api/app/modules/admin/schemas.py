@@ -119,6 +119,8 @@ class AdminProductDetail(BaseModel):
     slug: str
     short_description: str | None = None
     description: str | None = None
+    meta_title: str | None = None
+    meta_description: str | None = None
     product_type: str
     brand_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
