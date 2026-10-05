@@ -7,7 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.shared.enums import Gender, NotePosition
 
-SortOption = Literal["newest", "price_asc", "price_desc", "name", "rating", "featured"]
+SortOption = Literal[
+    "newest", "price_asc", "price_desc", "name", "rating", "featured", "bestselling"
+]
 
 
 class _Orm(BaseModel):
@@ -112,6 +114,8 @@ class ProductSummary(_Orm):
 
 class ProductDetail(ProductSummary):
     description: str | None = None
+    meta_title: str | None = None
+    meta_description: str | None = None
     tax_rate: Decimal
     attributes: dict[str, Any]
     notes: NotePyramid = Field(default_factory=NotePyramid)
@@ -131,6 +135,7 @@ class ProductFilters(BaseModel):
     note: str | None = None  # fragrance note slug, any position
     min_price: Decimal | None = Field(default=None, ge=0)
     max_price: Decimal | None = Field(default=None, ge=0)
+    min_rating: Decimal | None = Field(default=None, ge=0, le=5)  # average stars, e.g. 4
     featured: bool | None = None
     in_stock: bool | None = None
     sort: SortOption = "newest"
@@ -148,6 +153,10 @@ class ProductFacets(BaseModel):
     product_types: list[FacetValue]
     families: list[FacetValue] = Field(default_factory=list)
     genders: list[FacetValue] = Field(default_factory=list)
+    # Most common notes in the result set (any pyramid position), busiest first.
+    notes: list[FacetValue] = Field(default_factory=list)
+    # Products rated at least N stars on average, slug = "4" / "3".
+    ratings: list[FacetValue] = Field(default_factory=list)
     price_min: Decimal | None = None
     price_max: Decimal | None = None
 
@@ -187,6 +196,8 @@ class ProductWriteBase(BaseModel):
     slug: str | None = Field(default=None, max_length=220)  # slugified from name if omitted
     short_description: str | None = Field(default=None, max_length=300)
     description: str | None = None
+    meta_title: str | None = Field(default=None, max_length=70)
+    meta_description: str | None = Field(default=None, max_length=170)
     product_type: str = Field(min_length=1, max_length=40)
     brand_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
