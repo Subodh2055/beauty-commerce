@@ -107,6 +107,7 @@ async def earnings_totals(db: AsyncSession, vendor_id: uuid.UUID) -> dict[str, D
                 [
                     VendorOrderStatus.PENDING,
                     VendorOrderStatus.PROCESSING,
+                    VendorOrderStatus.PACKED,
                     VendorOrderStatus.SHIPPED,
                     VendorOrderStatus.DELIVERED,
                 ]
