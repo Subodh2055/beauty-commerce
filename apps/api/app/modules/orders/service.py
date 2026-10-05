@@ -25,6 +25,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, NotFoundError, ValidationFailedError
 from app.core.logging import get_logger
 from app.integrations.payments import initiate_payment
+from app.modules.commission import repository as commission_repo
+from app.modules.commission import service as commission_service
 from app.modules.coupons import service as coupons_service
 from app.modules.inventory import service as inventory_service
 from app.modules.notifications import service as notifications_service
@@ -99,6 +101,7 @@ async def checkout(
     tax_total = Decimal("0")
     items: list[OrderItem] = []
     by_seller: dict[uuid.UUID | None, list[OrderItem]] = {}
+    line_category: dict[int, uuid.UUID | None] = {}  # id(OrderItem) -> category
     sellers: dict[uuid.UUID, Vendor] = {}
 
     for variant_id, qty in wanted.items():
@@ -138,6 +141,7 @@ async def checkout(
         )
         items.append(item)
         by_seller.setdefault(product.vendor_id, []).append(item)
+        line_category[id(item)] = product.category_id
         if product.vendor is not None:
             sellers[product.vendor.id] = product.vendor
 
@@ -151,19 +155,26 @@ async def checkout(
             db, body.coupon_code, subtotal, user_id
         )
 
-    shipping_fee = (
-        Decimal("0") if subtotal >= platform.free_shipping_threshold else platform.shipping_fee
-    )
-    # Prices are VAT-inclusive, so tax is reported, not added on top.
-    total = (subtotal - discount_total + shipping_fee).quantize(Q)
+    addr = body.shipping_address
+    shipping_fee = settings_service.shipping_fee_for(platform, subtotal, addr.city, addr.state)
+    # Tax-inclusive prices (the default) report tax; otherwise it is added on top.
+    added_tax = Decimal("0") if platform.taxes.prices_include_tax else tax_total.quantize(Q)
+    total = (subtotal - discount_total + shipping_fee + added_tax).quantize(Q)
 
     method = body.payment_method
+    if method not in platform.payments.enabled_methods:
+        raise ValidationFailedError("That payment method isn't available right now")
+    cod_cap = platform.payments.cod_max_total
+    if method == PaymentMethod.COD and cod_cap is not None and total > cod_cap:
+        raise ValidationFailedError(
+            f"Cash on delivery is available for orders up to {platform.base_currency} "
+            f"{cod_cap:,.0f}. Please choose another payment method."
+        )
     # For COD the order is accepted immediately; online methods await payment.
     order_status = (
         OrderStatus.PROCESSING if method == PaymentMethod.COD else OrderStatus.PENDING_PAYMENT
     )
 
-    addr = body.shipping_address
     order = Order(
         order_number=await repo.next_order_number(db),
         user_id=user_id,
@@ -173,7 +184,7 @@ async def checkout(
         tax_total=tax_total.quantize(Q),
         discount_total=discount_total,
         total=total,
-        currency="NPR",
+        currency=platform.base_currency,
         payment_method=method,
         payment_status=PaymentStatus.PENDING,
         ship_recipient=addr.recipient_name,
@@ -190,9 +201,12 @@ async def checkout(
     sub_status = (
         VendorOrderStatus.PROCESSING if method == PaymentMethod.COD else VendorOrderStatus.PENDING
     )
+    tree = await commission_repo.category_tree(db)
     for vendor_id, lines in by_seller.items():
         order.vendor_orders.append(
-            _vendor_order(vendor_id, sellers.get(vendor_id), lines, sub_status, platform)
+            _vendor_order(
+                vendor_id, sellers.get(vendor_id), lines, sub_status, platform, tree, line_category
+            )
         )
     order.history.append(
         OrderStatusHistory(
@@ -252,19 +266,35 @@ def _vendor_order(
     lines: list[OrderItem],
     status: str,
     platform: PlatformSettings,
+    tree: commission_service.CategoryTree,
+    line_category: dict[int, uuid.UUID | None],
 ) -> VendorOrder:
-    """One seller's share with its money split. The rate is snapshotted: later
-    commission changes never alter what this sale owes the vendor."""
+    """One seller's share with its money split. Each line's rate (vendor
+    override → category → global) is snapshotted on the line, and the
+    sub-order keeps the total: later rule changes never alter what this sale
+    owes the vendor."""
     sub = sum((i.line_total for i in lines), Decimal("0")).quantize(Q)
+    commission = Decimal("0")
+    rates: set[Decimal] = set()
+    for item in lines:
+        rate = commission_service.line_rate(
+            vendor, line_category.get(id(item)), tree, platform.default_commission_rate
+        )
+        item.commission_rate = rate
+        item.commission_amount = (
+            (item.line_total * rate / Decimal(100)).quantize(Q) if rate is not None else None
+        )
+        if rate is not None:
+            rates.add(rate)
+            commission += item.commission_amount
     if vendor is None:
         rate, commission, earnings = None, Decimal("0"), Decimal("0")
     else:
-        rate = (
-            vendor.commission_rate
-            if vendor.commission_rate is not None
-            else platform.default_commission_rate
-        )
-        commission = (sub * Decimal(rate) / Decimal(100)).quantize(Q)
+        # One rate when every line agrees; otherwise the blended effective rate.
+        if len(rates) == 1:
+            rate = rates.pop()
+        else:
+            rate = (commission / sub * 100).quantize(Q) if sub else None
         earnings = sub - commission
     return VendorOrder(
         vendor_id=vendor_id,
