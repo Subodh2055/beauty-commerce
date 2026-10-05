@@ -76,6 +76,12 @@ const pairs = [
   ...["background", "surface", "surface-2"].map((s) => ["ring", s, UI, "focus ring"]),
   ...["background", "surface"].map((s) => ["gold", s, UI, "rating stars"]),
   ["primary", "background", UI, "primary button edge"],
+  // Super admin (platform) marking
+  ["platform", "platform-soft", TEXT, "super admin badge"],
+  ...surfaces.map((s) => ["platform", s, TEXT, "super admin text / outline buttons"]),
+  ["platform-foreground", "platform", TEXT, "super admin solid button"],
+  ["foreground", "platform-soft", TEXT, "super admin banner"],
+  ["muted", "platform-soft", TEXT, "super admin banner copy"],
   // Landing page
   ["on-image", "ink-fixed", TEXT, "brand story text"],
   ["champagne-fixed", "ink-fixed", TEXT, "brand story kickers"],
