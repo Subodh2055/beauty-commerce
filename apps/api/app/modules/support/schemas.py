@@ -58,6 +58,28 @@ class TicketDetail(TicketSummary):
     messages: list[MessageOut]
 
 
+class StaffTicketSummary(TicketSummary):
+    requester_id: uuid.UUID
+    requester_email: str | None = None
+    requester_name: str | None = None
+    assigned_to: uuid.UUID | None = None
+    assignee_email: str | None = None
+    message_count: int = 0
+    last_message_at: datetime | None = None
+    # The newest visible message came from the requester: someone should answer.
+    needs_reply: bool = False
+
+
 class StaffTicketDetail(TicketDetail):
     requester_id: uuid.UUID
+    requester_email: str | None = None
+    requester_name: str | None = None
     assigned_to: uuid.UUID | None = None
+    assignee_email: str | None = None
+    order_number: str | None = None
+
+
+class Assignee(BaseModel):
+    id: uuid.UUID
+    email: str
+    full_name: str | None = None
