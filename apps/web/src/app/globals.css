@@ -48,6 +48,13 @@
   --danger-foreground: #ffffff;
   --danger-soft: #fbe6e3;
 
+  /* Platform (super admin): a violet outside the storefront palette so
+     platform-wide controls never pass for everyday admin actions. Always paired
+     with the shield icon and the words "Super admin". */
+  --platform: #5a3d96;
+  --platform-soft: #eee8f7;
+  --platform-foreground: #ffffff;
+
   /* Charts: Okabe–Ito hues (distinguishable with every common colour-vision
      deficiency); series also differ by shape, never by colour alone. 3:1+ on surfaces. */
   --chart-1: #0072b2; /* blue */
@@ -94,6 +101,10 @@
   --danger: #f39a8f;
   --danger-foreground: #17151f;
   --danger-soft: #36191a;
+
+  --platform: #c4b1ef;
+  --platform-soft: #251d38;
+  --platform-foreground: #17151f;
 
   --chart-1: #56b4e9; /* sky blue */
   --chart-2: #e69f00; /* orange */
@@ -155,6 +166,9 @@
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
   --color-danger-soft: var(--danger-soft);
+  --color-platform: var(--platform);
+  --color-platform-soft: var(--platform-soft);
+  --color-platform-foreground: var(--platform-foreground);
   --color-ring: var(--ring);
   --color-scrim: rgb(var(--scrim));
   --color-image-scrim: rgb(var(--image-scrim));
