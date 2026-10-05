@@ -113,11 +113,52 @@ export interface ProductVariant {
   sku: string;
   name: string;
   options: Record<string, string>;
+  size_ml: string | null;
   price: string;
   compare_at_price: string | null;
   stock_quantity: number;
   is_default: boolean;
   sort_order: number;
+}
+
+export type Gender = "WOMEN" | "MEN" | "UNISEX";
+
+export interface VendorRef {
+  id: string;
+  name: string;
+  slug: string;
+}
+
+export interface FragranceFamily {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sort_order: number;
+}
+
+export interface FragranceNote {
+  id: string;
+  name: string;
+  slug: string;
+  family_id: string | null;
+}
+
+export interface NotePyramid {
+  top: FragranceNote[];
+  heart: FragranceNote[];
+  base: FragranceNote[];
+}
+
+export interface FeaturedReview {
+  id: string;
+  rating: number;
+  title: string | null;
+  body: string;
+  /** "Asha S." — first name and initial only */
+  author: string;
+  is_verified_purchase: boolean;
+  product: { name: string; slug: string };
 }
 
 export interface ProductSummary {
@@ -135,6 +176,10 @@ export interface ProductSummary {
   rating_count: number;
   brand: Brand | null;
   category: Category | null;
+  /** null = sold by the platform itself */
+  vendor: VendorRef | null;
+  gender: Gender | null;
+  fragrance_family: FragranceFamily | null;
   primary_image: ProductImage | null;
   in_stock: boolean;
   tags: string[];
@@ -144,6 +189,7 @@ export interface ProductDetail extends ProductSummary {
   description: string | null;
   tax_rate: string;
   attributes: Record<string, unknown>;
+  notes: NotePyramid;
   images: ProductImage[];
   variants: ProductVariant[];
   published_at: string | null;
@@ -166,6 +212,12 @@ export interface ProductFacets {
   categories: FacetValue[];
   brands: FacetValue[];
   product_types: FacetValue[];
+  families: FacetValue[];
+  genders: FacetValue[];
+  /** Busiest notes in the result set (any pyramid position). */
+  notes: FacetValue[];
+  /** slug "4" / "3": products averaging at least that many stars. */
+  ratings: FacetValue[];
   price_min: string | null;
   price_max: string | null;
 }
@@ -176,15 +228,21 @@ export type SortOption =
   | "price_desc"
   | "name"
   | "rating"
-  | "featured";
+  | "featured"
+  | "bestselling";
 
 export type ProductQuery = {
   q?: string;
   category?: string;
   brand?: string;
   product_type?: string;
+  vendor?: string;
+  gender?: Gender;
+  family?: string;
+  note?: string;
   min_price?: string;
   max_price?: string;
+  min_rating?: number;
   featured?: boolean;
   in_stock?: boolean;
   sort?: SortOption;
@@ -221,6 +279,25 @@ export const getRelatedProducts = (slug: string) =>
     next: { revalidate: CATALOG_REVALIDATE, tags: ["products"] },
   });
 
+/** Fragrances that share notes (heart/base weigh double) or the same family. */
+export const getSimilarScents = (slug: string) =>
+  api<ProductSummary[]>(`/products/${encodeURIComponent(slug)}/similar`, {
+    next: { revalidate: CATALOG_REVALIDATE, tags: ["products"] },
+  });
+
+export interface PublicSettings {
+  free_shipping_threshold: string;
+  shipping_fee: string;
+  vendor_applications_open: boolean;
+  support_email: string;
+}
+
+/** Shipping rules etc. Works on the server (cached) and in the browser. */
+export const getPublicSettings = () =>
+  api<PublicSettings>("/settings/public", {
+    next: { revalidate: CATALOG_REVALIDATE, tags: ["settings"] },
+  });
+
 export const getCategoryTree = () =>
   api<CategoryTree[]>("/categories", {
     next: { revalidate: CATALOG_REVALIDATE, tags: ["categories"] },
@@ -239,4 +316,28 @@ export const getBrands = () =>
 export const getBrand = (slug: string) =>
   api<Brand>(`/brands/${encodeURIComponent(slug)}`, {
     next: { revalidate: CATALOG_REVALIDATE, tags: ["brands"] },
+  });
+
+export const getFeaturedReviews = (limit = 12) =>
+  api<FeaturedReview[]>("/reviews/featured", {
+    query: { limit },
+    next: { revalidate: CATALOG_REVALIDATE, tags: ["reviews"] },
+  });
+
+export const getFragranceFamilies = () =>
+  api<FragranceFamily[]>("/fragrance/families", {
+    next: { revalidate: CATALOG_REVALIDATE, tags: ["fragrance"] },
+  });
+
+export const getFragranceNotes = () =>
+  api<FragranceNote[]>("/fragrance/notes", {
+    next: { revalidate: CATALOG_REVALIDATE, tags: ["fragrance"] },
+  });
+
+/** Browser-side: join the newsletter. Same reply whether or not already subscribed. */
+export const subscribeNewsletter = (email: string, source = "footer") =>
+  api<{ message: string }>("/newsletter/subscriptions", {
+    method: "POST",
+    body: JSON.stringify({ email, source }),
+    cache: "no-store",
   });
