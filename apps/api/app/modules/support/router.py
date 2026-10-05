@@ -9,9 +9,11 @@ from app.modules.audit.dependencies import Audited
 from app.modules.auth.dependencies import CurrentUser, require_permission
 from app.modules.support import service
 from app.modules.support.schemas import (
+    Assignee,
     MessageIn,
     StaffMessageIn,
     StaffTicketDetail,
+    StaffTicketSummary,
     TicketCreateIn,
     TicketDetail,
     TicketSummary,
@@ -23,7 +25,8 @@ from app.shared.pagination import Page, PageParams, page_params
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 Paging = Annotated[PageParams, Depends(page_params)]
-SupportStaff = Annotated[User, Depends(require_permission(Permission.SUPPORT_MANAGE))]
+SupportView = Annotated[User, Depends(require_permission(Permission.SUPPORT_VIEW))]
+SupportStaff = Annotated[User, Depends(require_permission(Permission.SUPPORT_EDIT))]
 
 router = APIRouter()  # /support — the requester's own tickets
 admin_router = APIRouter(dependencies=[Audited])  # /admin/support
@@ -56,19 +59,28 @@ async def close(ticket_id: uuid.UUID, db: DbSession, user: CurrentUser) -> Ticke
     return await service.close_mine(db, user.id, ticket_id)
 
 
-@admin_router.get("/tickets", response_model=Page[TicketSummary])
+@admin_router.get("/tickets", response_model=Page[StaffTicketSummary])
 async def all_tickets(
     db: DbSession,
-    _: SupportStaff,
+    _: SupportView,
     page: Paging,
     status: str | None = Query(default=None),
+    priority: str | None = Query(default=None, max_length=10),
+    q: str | None = Query(default=None, max_length=100),
     assigned_to: Annotated[uuid.UUID | None, Query()] = None,
-) -> Page[TicketSummary]:
-    return await service.list_all(db, page, status=status, assigned_to=assigned_to)
+) -> Page[StaffTicketSummary]:
+    return await service.list_all(
+        db, page, status=status, assigned_to=assigned_to, priority=priority, q=q
+    )
+
+
+@admin_router.get("/assignees", response_model=list[Assignee], summary="Staff who can answer")
+async def assignees(db: DbSession, _: SupportView) -> list[Assignee]:
+    return await service.assignees(db)
 
 
 @admin_router.get("/tickets/{ticket_id}", response_model=StaffTicketDetail)
-async def staff_ticket(ticket_id: uuid.UUID, db: DbSession, _: SupportStaff) -> StaffTicketDetail:
+async def staff_ticket(ticket_id: uuid.UUID, db: DbSession, _: SupportView) -> StaffTicketDetail:
     return await service.get_staff(db, ticket_id)
 
 
