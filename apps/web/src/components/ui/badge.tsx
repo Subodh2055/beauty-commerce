@@ -1,13 +1,17 @@
 import type { ReactNode } from "react";
 
-type Tone = "neutral" | "accent" | "gold" | "success" | "danger";
+export type BadgeTone = "neutral" | "accent" | "gold" | "success" | "warning" | "danger" | "solid";
 
-const tones: Record<Tone, string> = {
+// Every tone pairs a text token with its own soft background (AA-checked in
+// scripts/check-contrast.mjs); colour is never the only signal — badges carry text.
+const tones: Record<BadgeTone, string> = {
   neutral: "bg-surface-2 text-foreground",
-  accent: "bg-accent text-accent-foreground",
-  gold: "bg-gold/15 text-gold",
-  success: "bg-success/15 text-success",
-  danger: "bg-danger/15 text-danger",
+  accent: "bg-accent-soft text-accent",
+  gold: "bg-gold-soft text-gold-strong",
+  success: "bg-success-soft text-success",
+  warning: "bg-warning-soft text-warning",
+  danger: "bg-danger-soft text-danger",
+  solid: "bg-primary text-primary-foreground",
 };
 
 export function Badge({
@@ -15,13 +19,13 @@ export function Badge({
   className = "",
   children,
 }: {
-  tone?: Tone;
+  tone?: BadgeTone;
   className?: string;
   children: ReactNode;
 }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide ${tones[tone]} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-pill px-2.5 py-0.5 text-2xs font-semibold tracking-wide whitespace-nowrap uppercase ${tones[tone]} ${className}`}
     >
       {children}
     </span>

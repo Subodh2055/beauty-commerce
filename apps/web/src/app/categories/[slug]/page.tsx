@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ApiRequestError, getCategory, getCategoryTree, type CategoryTree } from "@/lib/api";
 import { PageHeader } from "@/components/catalog/page-header";
-import { ProductListing, parseQuery } from "@/components/catalog/product-listing";
-import { ProductGridSkeleton } from "@/components/ui/skeleton";
+import { ProductListing, parseQuery, parseView } from "@/components/catalog/product-listing";
+import { ListingSkeleton } from "@/components/ui/skeleton";
 
 async function loadCategory(slug: string) {
   try {
@@ -46,6 +46,7 @@ export default async function CategoryPage(props: PageProps<"/categories/[slug]"
   const node = findNode(tree, slug);
   const parent = findParent(tree, slug);
   const query = parseQuery(sp, { category: slug });
+  const view = parseView(sp);
 
   const crumbs = [
     ...(parent ? [{ href: `/categories/${parent.slug}`, label: parent.name }] : []),
@@ -70,8 +71,8 @@ export default async function CategoryPage(props: PageProps<"/categories/[slug]"
         </nav>
       )}
 
-      <Suspense key={JSON.stringify(query)} fallback={<ProductGridSkeleton />}>
-        <ProductListing query={query} pathname={`/categories/${slug}`} lock={{ category: true }} />
+      <Suspense key={JSON.stringify(query) + view} fallback={<ListingSkeleton view={view} />}>
+        <ProductListing query={query} view={view} pathname={`/categories/${slug}`} lock={{ category: true }} />
       </Suspense>
     </div>
   );

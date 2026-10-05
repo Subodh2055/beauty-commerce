@@ -6,6 +6,8 @@ import { toast } from "@/lib/toast";
 import { AddressCard, AddressForm } from "./address-form";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { confirmDialog } from "@/components/ui/confirm";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export function AddressBook() {
   const api = useAddresses();
@@ -49,20 +51,31 @@ export function AddressBook() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Delete this address?")) return;
+    const ok = await confirmDialog({ title: "Delete this address?", confirmLabel: "Delete", tone: "danger" });
+    if (!ok) return;
+    // Optimistic: drop it now, put it back if the server refuses.
+    const before = items;
+    setItems((list) => list?.filter((a) => a.id !== id) ?? null);
     try {
       await api.remove(id);
-      await refresh();
       toast.info("Address deleted");
+      await refresh(); // the server may have promoted a new default
     } catch (err) {
+      setItems(before);
       toast.error(err instanceof Error ? err.message : "Could not delete");
     }
   }
 
   async function setDefault(id: string) {
-    await api.setDefault(id);
-    await refresh();
-    toast.success("Default address updated");
+    const before = items;
+    setItems((list) => list?.map((a) => ({ ...a, is_default: a.id === id })) ?? null);
+    try {
+      await api.setDefault(id);
+      toast.success("Default address updated");
+    } catch (err) {
+      setItems(before);
+      toast.error(err instanceof Error ? err.message : "Could not update");
+    }
   }
 
   if (!items) return <Skeleton className="h-40" />;
@@ -70,7 +83,7 @@ export function AddressBook() {
   return (
     <div className="space-y-4">
       {items.length === 0 && !adding && (
-        <p className="text-sm text-muted">No saved addresses yet.</p>
+        <EmptyState compact title="No saved addresses" description="Add one now and checkout will fill it in for you." icon={null} />
       )}
 
       {!adding && !editing && (
@@ -88,14 +101,14 @@ export function AddressBook() {
       )}
 
       {adding && (
-        <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
+        <div className="rounded-card border border-border bg-surface p-5 shadow-soft">
           <h3 className="mb-3 font-medium">New address</h3>
           <AddressForm onSubmit={create} onCancel={() => setAdding(false)} />
         </div>
       )}
 
       {editing && (
-        <div className="rounded-2xl border border-border bg-surface p-5 shadow-soft">
+        <div className="rounded-card border border-border bg-surface p-5 shadow-soft">
           <h3 className="mb-3 font-medium">Edit address</h3>
           <AddressForm initial={editing} onSubmit={update} onCancel={() => setEditing(null)} />
         </div>

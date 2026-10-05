@@ -83,7 +83,7 @@ export function Footer({ categories }: { categories: CategoryTree[] }) {
             {PAYMENTS.map((p) => (
               <span
                 key={p}
-                className="rounded-md border border-border bg-background px-2 py-1 text-[10px] font-medium"
+                className="rounded-md border border-border bg-background px-2 py-1 text-2xs font-medium"
               >
                 {p}
               </span>

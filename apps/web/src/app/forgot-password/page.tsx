@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
       }
     >
       {message ? (
-        <p className="rounded-xl border border-success/30 bg-success/10 px-3.5 py-3 text-sm text-success">
+        <p className="rounded-control border border-success/30 bg-success/10 px-3.5 py-3 text-sm text-success">
           {message}
         </p>
       ) : (

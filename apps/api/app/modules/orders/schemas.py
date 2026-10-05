@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.shared.enums import PaymentMethod
+from app.shared.enums import PaymentMethod, VendorOrderStatus
 
 
 class ShippingAddressIn(BaseModel):
@@ -52,6 +52,19 @@ class OrderStatusEventOut(BaseModel):
     created_at: datetime
 
 
+class ShipmentOut(BaseModel):
+    """One seller's part of an order, as the customer sees it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    seller_name: str | None = None  # None = shipped by the platform
+    status: str
+    tracking_number: str | None = None
+    shipped_at: datetime | None = None
+    delivered_at: datetime | None = None
+
+
 class OrderSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -92,6 +105,7 @@ class OrderDetail(BaseModel):
     created_at: datetime
     items: list[OrderItemOut]
     history: list[OrderStatusEventOut]
+    shipments: list[ShipmentOut] = Field(default_factory=list, validation_alias="vendor_orders")
 
 
 class CheckoutResult(BaseModel):
@@ -99,3 +113,38 @@ class CheckoutResult(BaseModel):
     # Set for online methods that need a redirect; null for COD.
     payment_redirect_url: str | None = None
     message: str
+
+
+class VendorOrderOut(BaseModel):
+    """A vendor's view of their share of an order: only their lines and money,
+    plus what they need to ship it."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    order_number: str
+    created_at: datetime
+    status: str
+    payment_status: str
+    subtotal: Decimal
+    commission_rate: Decimal | None = None
+    commission_amount: Decimal
+    vendor_earnings: Decimal
+    tracking_number: str | None = None
+    shipped_at: datetime | None = None
+    delivered_at: datetime | None = None
+    paid_out: bool
+    items: list[OrderItemOut]
+    ship_recipient: str
+    ship_phone: str
+    ship_line1: str
+    ship_line2: str | None = None
+    ship_city: str
+    ship_state: str | None = None
+    ship_postal_code: str | None = None
+    ship_country: str
+
+
+class VendorOrderStatusIn(BaseModel):
+    status: VendorOrderStatus
+    tracking_number: str | None = Field(default=None, max_length=100)

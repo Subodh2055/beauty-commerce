@@ -21,11 +21,96 @@ class OrderStatus(StrEnum):
     PAYMENT_FAILED = "PAYMENT_FAILED"
 
 
+class Permission(StrEnum):
+    """Fine-grained grants, attached to roles via `role_permissions`.
+    SUPER_ADMIN passes every check regardless of rows."""
+
+    DASHBOARD_READ = "dashboard.read"
+    CATALOG_MANAGE = "catalog.manage"
+    CATALOG_MODERATE = "catalog.moderate"
+    ORDERS_MANAGE = "orders.manage"
+    INVENTORY_MANAGE = "inventory.manage"
+    COUPONS_MANAGE = "coupons.manage"
+    VENDORS_MANAGE = "vendors.manage"
+    PAYOUTS_MANAGE = "payouts.manage"
+    CMS_MANAGE = "cms.manage"
+    SUPPORT_MANAGE = "support.manage"
+    SETTINGS_MANAGE = "settings.manage"
+    AUDIT_READ = "audit.read"
+    MEDIA_UPLOAD = "media.upload"
+    VENDOR_PORTAL = "vendor.portal"
+
+
 class ProductStatus(StrEnum):
+    """DRAFT → PENDING (submitted) → PUBLISHED (approved, live) or REJECTED.
+    ARCHIVED takes a product off sale without deleting it."""
+
     DRAFT = "DRAFT"
-    REVIEW = "REVIEW"
+    PENDING = "PENDING"
     PUBLISHED = "PUBLISHED"
+    REJECTED = "REJECTED"
     ARCHIVED = "ARCHIVED"
+
+
+class Gender(StrEnum):
+    WOMEN = "WOMEN"
+    MEN = "MEN"
+    UNISEX = "UNISEX"
+
+
+class NotePosition(StrEnum):
+    TOP = "TOP"
+    HEART = "HEART"
+    BASE = "BASE"
+
+
+class VendorStatus(StrEnum):
+    PENDING = "PENDING"  # application submitted, awaiting review
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    SUSPENDED = "SUSPENDED"
+
+
+class VendorOrderStatus(StrEnum):
+    """Fulfilment state of one vendor's share of an order."""
+
+    PENDING = "PENDING"  # parent order awaiting payment
+    PROCESSING = "PROCESSING"  # paid / COD accepted: new, to be packed
+    PACKED = "PACKED"  # packed and waiting for the courier
+    SHIPPED = "SHIPPED"
+    DELIVERED = "DELIVERED"
+    CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
+
+
+class PayoutStatus(StrEnum):
+    PENDING = "PENDING"
+    PAID = "PAID"
+    CANCELLED = "CANCELLED"
+
+
+class TicketStatus(StrEnum):
+    OPEN = "OPEN"
+    AWAITING_CUSTOMER = "AWAITING_CUSTOMER"
+    RESOLVED = "RESOLVED"
+    CLOSED = "CLOSED"
+
+
+class TicketPriority(StrEnum):
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+
+
+class MediaStatus(StrEnum):
+    PENDING = "PENDING"
+    READY = "READY"
+    FAILED = "FAILED"
+
+
+class SubscriptionStatus(StrEnum):
+    SUBSCRIBED = "SUBSCRIBED"
+    UNSUBSCRIBED = "UNSUBSCRIBED"
 
 
 class PaymentMethod(StrEnum):

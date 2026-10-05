@@ -6,12 +6,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.modules.auth.dependencies import CurrentUser
+from app.modules.auth.schemas import UserOut
 from app.modules.users import service
-from app.modules.users.schemas import AddressIn, AddressOut
+from app.modules.users.schemas import AddressIn, AddressOut, ProfileIn
 
 router = APIRouter()
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
+
+
+@router.patch("/me", response_model=UserOut, summary="Update my profile")
+async def update_profile(body: ProfileIn, db: DbSession, user: CurrentUser) -> UserOut:
+    return await service.update_profile(db, user, body)
 
 
 @router.get("/me/addresses", response_model=list[AddressOut], summary="List my addresses")

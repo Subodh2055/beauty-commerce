@@ -22,7 +22,7 @@ export default async function BrandsPage() {
           <li key={b.id}>
             <Link
               href={`/brands/${b.slug}`}
-              className="group focus-ring flex h-full flex-col gap-3 rounded-2xl border border-border bg-surface p-5 transition-colors hover:border-foreground"
+              className="group focus-ring flex h-full flex-col gap-3 rounded-card border border-border bg-surface p-5 transition-colors hover:border-foreground"
             >
               <div className="relative h-14 w-14 overflow-hidden rounded-full bg-surface-2">
                 {b.logo_url && (

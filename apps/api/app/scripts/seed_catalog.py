@@ -1,18 +1,46 @@
-"""Seed a demo catalog. Idempotent: skips if any product exists.
+"""Seed a realistic demo marketplace. Idempotent, section by section.
 
 python -m app.scripts.seed_catalog
+
+- fragrance families + common notes (get-or-create by slug)
+- platform catalogue: brands, categories, 24 products with note pyramids,
+  gender and bottle sizes (skipped if any product exists)
+- demo vendors with their own products, one awaiting moderation, and one
+  pending application (skipped if any vendor exists; never in production)
+- homepage banners (skipped if any banner exists)
 """
 
 import asyncio
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
 
+import app.models  # noqa: F401 — register every mapper
+from app.core import cache
+from app.core.config import settings
 from app.core.database import SessionLocal
 from app.core.logging import configure_logging, get_logger
-from app.modules.catalog.models import Brand, Category, Product, ProductImage, ProductVariant
-from app.shared.enums import ProductStatus
+from app.core.security import hash_password
+from app.modules.catalog import cache as _catalog_cache  # noqa: F401 — invalidation listeners
+from app.modules.catalog.models import (
+    Brand,
+    Category,
+    FragranceFamily,
+    FragranceNote,
+    Product,
+    ProductImage,
+    ProductNote,
+    ProductVariant,
+)
+from app.modules.catalog.service import slugify
+from app.modules.cms.models import Banner
+from app.modules.reviews.models import Review
+from app.modules.reviews.repository import recompute_product_rating
+from app.modules.users.models import Role, User
+from app.modules.vendors.models import Vendor
+from app.shared.enums import Gender, ProductStatus, VendorStatus
 
 log = get_logger(__name__)
 
@@ -606,90 +634,554 @@ PRODUCTS = [
 ]
 
 
-async def seed() -> None:
-    configure_logging()
-    async with SessionLocal() as db:
-        if await db.scalar(select(func.count()).select_from(Product)):
-            log.info("seed_skipped", reason="products already exist")
-            return
+FAMILIES = [
+    # (name, description) — the core olfactive families used for browsing.
+    ("Floral", "Rose, jasmine, tuberose and other flowers at the heart."),
+    ("White Floral", "Creamy, heady blooms: jasmine sambac, gardenia, orange blossom."),
+    ("Woody", "Sandalwood, cedar, vetiver and oud."),
+    ("Amber", "Warm resins, vanilla and spice (formerly 'Oriental')."),
+    ("Woody Oriental", "Woods wrapped in amber, spice and incense."),
+    ("Citrus", "Bergamot, lemon, yuzu and neroli — bright and fresh."),
+    ("Aromatic", "Lavender, sage, rosemary and other herbs."),
+    ("Aquatic", "Sea air, salt and watery accords."),
+    ("Gourmand", "Edible notes: vanilla, caramel, coffee, praline."),
+    ("Chypre", "Bergamot over oakmoss and patchouli."),
+    ("Leather", "Smoky, supple leather and birch tar."),
+    ("Green", "Cut grass, fig leaf, galbanum and crushed stems."),
+]
 
-        brands = {}
-        for name, slug, country, desc in BRANDS:
-            b = Brand(
-                name=name,
-                slug=slug,
-                country=country,
-                description=desc,
-                logo_url=img(f"brand-{slug}", 400, 400),
+# Where common notes belong, so note pages can be browsed by family.
+NOTE_FAMILIES = {
+    "Bergamot": "Citrus",
+    "Lemon": "Citrus",
+    "Grapefruit": "Citrus",
+    "Yuzu": "Citrus",
+    "Neroli": "Citrus",
+    "Mandarin": "Citrus",
+    "Rose": "Floral",
+    "Peony": "Floral",
+    "Iris": "Floral",
+    "Violet": "Floral",
+    "Jasmine": "White Floral",
+    "Tuberose": "White Floral",
+    "Orange Blossom": "White Floral",
+    "Sandalwood": "Woody",
+    "Cedarwood": "Woody",
+    "Cedar": "Woody",
+    "Vetiver": "Woody",
+    "Oud": "Woody",
+    "Amber": "Amber",
+    "Vanilla": "Gourmand",
+    "Tonka Bean": "Gourmand",
+    "Lavender": "Aromatic",
+    "Sage": "Aromatic",
+    "Rosemary": "Aromatic",
+    "Sea Salt": "Aquatic",
+    "Patchouli": "Chypre",
+    "Oakmoss": "Chypre",
+    "Leather": "Leather",
+    "Fig Leaf": "Green",
+}
+
+GENDERS = {"women": Gender.WOMEN, "men": Gender.MEN, "unisex": Gender.UNISEX}
+
+# Demo marketplace sellers (never created in production). The owners can sign
+# in with DEMO_VENDOR_PASSWORD to try the vendor portal.
+DEMO_VENDOR_PASSWORD = "Vendor@12345"
+VENDORS = [
+    {
+        "name": "Kathmandu Attar House",
+        "slug": "kathmandu-attar-house",
+        "email": "attar@vendors.example.com",
+        "status": VendorStatus.APPROVED,
+        "commission": Decimal("12.00"),
+        "description": "Alcohol-free attars distilled in small batches in Thamel since 1994.",
+        "tax_id": "PAN-301456789",
+    },
+    {
+        "name": "Seoul Glow Lab",
+        "slug": "seoul-glow-lab",
+        "email": "glow@vendors.example.com",
+        "status": VendorStatus.APPROVED,
+        "commission": None,  # platform default
+        "description": "Authorised Korean skincare importer, batch-tested for Nepal's climate.",
+        "tax_id": "PAN-609876543",
+    },
+    {
+        "name": "Lumière Niche Parfums",
+        "slug": "lumiere-niche-parfums",
+        "email": "lumiere@vendors.example.com",
+        "status": VendorStatus.PENDING,  # an application waiting in the admin queue
+        "commission": None,
+        "description": "Independent French niche house applying to sell in Nepal.",
+        "tax_id": None,
+    },
+]
+
+VENDOR_PRODUCTS = {
+    "kathmandu-attar-house": [
+        dict(
+            sku="KAH-ATR-001",
+            name="Mitti Attar",
+            slug="mitti-attar",
+            category="unisex-fragrance",
+            price="3200",
+            family="Green",
+            gender="unisex",
+            notes={"TOP": ["Petrichor"], "HEART": ["Vetiver"], "BASE": ["Sandalwood"]},
+            sizes=((6, 1.0, 40), (12, 1.8, 25)),
+            short="The scent of first monsoon rain on baked earth, in sandalwood oil.",
+            status=ProductStatus.PUBLISHED,
+        ),
+        dict(
+            sku="KAH-ATR-002",
+            name="Shamama Royal Attar",
+            slug="shamama-royal-attar",
+            category="unisex-fragrance",
+            price="5400",
+            family="Amber",
+            gender="unisex",
+            notes={"TOP": ["Saffron"], "HEART": ["Rose", "Oud"], "BASE": ["Amber", "Musk"]},
+            sizes=((6, 1.0, 18), (12, 1.8, 10)),
+            short="A dense, spiced amber attar aged for a full year.",
+            status=ProductStatus.PUBLISHED,
+        ),
+        dict(
+            sku="KAH-ATR-003",
+            name="Rajanigandha Attar",
+            slug="rajanigandha-attar",
+            category="womens-fragrance",
+            price="2900",
+            family="White Floral",
+            gender="women",
+            notes={"TOP": ["Bergamot"], "HEART": ["Tuberose", "Jasmine"], "BASE": ["Sandalwood"]},
+            sizes=((6, 1.0, 30),),
+            short="Night-blooming tuberose distilled into sandalwood.",
+            # Submitted, waiting for an admin — try the moderation queue with this one.
+            status=ProductStatus.PENDING,
+        ),
+    ],
+    "seoul-glow-lab": [
+        dict(
+            sku="SGL-SER-101",
+            name="Rice Ferment Glow Serum",
+            slug="rice-ferment-glow-serum",
+            category="serums",
+            price="2650",
+            product_type="serum",
+            sizes=((30, 1.0, 35), (50, 1.55, 20)),
+            short="Fermented rice water and niacinamide for an even, dewy tone.",
+            attrs={
+                "skin_type": ["All", "Dull"],
+                "key_ingredients": ["Rice Ferment", "Niacinamide"],
+            },
+            status=ProductStatus.PUBLISHED,
+        ),
+        dict(
+            sku="SGL-SPF-102",
+            name="Daily Mineral Sun Fluid SPF50+",
+            slug="daily-mineral-sun-fluid-spf50",
+            category="skincare",
+            price="1950",
+            product_type="sunscreen",
+            sizes=((50, 1.0, 60),),
+            short="Weightless zinc oxide fluid with no white cast.",
+            attrs={"skin_type": ["All", "Sensitive"], "spf": "50+", "pa": "++++"},
+            status=ProductStatus.PUBLISHED,
+        ),
+    ],
+}
+
+BANNERS = [
+    dict(
+        placement="home_hero",
+        title="The Monsoon Edit",
+        subtitle="Petrichor, vetiver and green notes for the rainy season.",
+        link_url="/products?family=green",
+        cta_label="Shop the edit",
+        sort_order=0,
+    ),
+    dict(
+        placement="home_hero",
+        title="Attars from Thamel",
+        subtitle="Alcohol-free perfume oils from Kathmandu Attar House.",
+        link_url="/products?vendor=kathmandu-attar-house",
+        cta_label="Discover attars",
+        sort_order=1,
+    ),
+    dict(
+        placement="home_hero",
+        title="Glow, Seoul-style",
+        subtitle="Korean skincare, batch-tested for Himalayan weather.",
+        link_url="/products?vendor=seoul-glow-lab",
+        cta_label="Shop skincare",
+        sort_order=2,
+    ),
+    dict(
+        placement="home_strip",
+        title="Free delivery inside the valley on orders over Rs 5,000",
+        link_url="/products",
+        sort_order=0,
+    ),
+]
+
+
+def _size_ml(*labels: object) -> Decimal | None:
+    for label in labels:
+        match = re.search(r"([0-9]+(?:\.[0-9]+)?)\s*ml\b", str(label or ""), re.IGNORECASE)
+        if match:
+            return Decimal(match.group(1))
+    return None
+
+
+class _Taxonomy:
+    """Get-or-create families and notes by slug within one seeding session."""
+
+    def __init__(self, db) -> None:
+        self.db = db
+        self.families: dict[str, FragranceFamily] = {}
+        self.notes: dict[str, FragranceNote] = {}
+
+    async def load(self) -> None:
+        for f in await self.db.scalars(select(FragranceFamily)):
+            self.families[f.slug] = f
+        for n in await self.db.scalars(select(FragranceNote)):
+            self.notes[n.slug] = n
+
+    def family(self, name: str, description: str | None = None) -> FragranceFamily:
+        slug = slugify(name)
+        fam = self.families.get(slug)
+        if fam is None:
+            fam = FragranceFamily(
+                name=name, slug=slug, description=description, sort_order=len(self.families)
             )
-            db.add(b)
-            brands[slug] = b
+            self.db.add(fam)
+            self.families[slug] = fam
+        elif description and not fam.description:
+            fam.description = description
+        return fam
 
-        categories = {}
-        for i, (name, slug, parent, desc) in enumerate(CATEGORIES):
-            c = Category(
-                name=name,
-                slug=slug,
-                description=desc,
-                sort_order=i,
-                parent=categories[parent] if parent else None,
-                image_url=img(f"cat-{slug}", 800, 600) if parent is None else None,
+    def note(self, name: str) -> FragranceNote:
+        slug = slugify(name)
+        note = self.notes.get(slug)
+        if note is None:
+            family_name = NOTE_FAMILIES.get(name)
+            note = FragranceNote(
+                name=name, slug=slug, family=self.family(family_name) if family_name else None
             )
-            db.add(c)
-            categories[slug] = c
+            self.db.add(note)
+            self.notes[slug] = note
+        return note
 
-        await db.flush()
+    def pyramid(self, by_position: dict[str, list[str]]) -> list[ProductNote]:
+        rows: list[ProductNote] = []
+        for position in ("TOP", "HEART", "BASE"):
+            for i, name in enumerate(dict.fromkeys(by_position.get(position, []))):
+                rows.append(ProductNote(note=self.note(name), position=position, sort_order=i))
+        return rows
 
-        now = datetime.now(UTC)
-        for spec in PRODUCTS:
-            rating_avg, rating_count = spec["rating"]
+
+async def _seed_catalog(db, tax: _Taxonomy) -> None:
+    if await db.scalar(select(func.count()).select_from(Product)):
+        log.info("seed_catalog_skipped", reason="products already exist")
+        return
+
+    brands = {}
+    for name, slug, country, desc in BRANDS:
+        b = Brand(
+            name=name,
+            slug=slug,
+            country=country,
+            description=desc,
+            logo_url=img(f"brand-{slug}", 400, 400),
+        )
+        db.add(b)
+        brands[slug] = b
+
+    categories = {}
+    for i, (name, slug, parent, desc) in enumerate(CATEGORIES):
+        c = Category(
+            name=name,
+            slug=slug,
+            description=desc,
+            sort_order=i,
+            parent=categories[parent] if parent else None,
+            image_url=img(f"cat-{slug}", 800, 600) if parent is None else None,
+        )
+        db.add(c)
+        categories[slug] = c
+
+    await db.flush()
+
+    now = datetime.now(UTC)
+    for spec in PRODUCTS:
+        rating_avg, rating_count = spec["rating"]
+        attrs = spec["attributes"]
+        p = Product(
+            sku=spec["sku"],
+            name=spec["name"],
+            slug=spec["slug"],
+            short_description=spec["short_description"],
+            description=spec["description"],
+            product_type=spec["product_type"],
+            brand=brands[spec["brand"]],
+            category=categories[spec["category"]],
+            base_price=spec["base_price"],
+            compare_at_price=spec["compare_at_price"],
+            is_featured=spec["is_featured"],
+            attributes=attrs,
+            tags=spec["tags"],
+            rating_avg=Decimal(rating_avg),
+            rating_count=rating_count,
+            status=ProductStatus.PUBLISHED,
+            published_at=now,
+        )
+        if spec["product_type"] == "perfume":
+            p.gender = GENDERS.get(str(attrs.get("gender", "")).lower())
+            p.fragrance_family = tax.family(attrs["fragrance_family"])
+            p.notes = tax.pyramid(
+                {
+                    "TOP": attrs.get("top_notes", []),
+                    "HEART": attrs.get("middle_notes", []),
+                    "BASE": attrs.get("base_notes", []),
+                }
+            )
+        for i, v in enumerate(spec["variants"]):
+            p.variants.append(
+                ProductVariant(
+                    sku=f"{spec['sku']}-{i + 1}",
+                    name=v["name"],
+                    options=v["options"],
+                    size_ml=_size_ml(*v["options"].values(), v["name"]),
+                    price=v["price"],
+                    compare_at_price=spec["compare_at_price"] if v["default"] else None,
+                    stock_quantity=v["stock"],
+                    is_default=v["default"],
+                    sort_order=i,
+                )
+            )
+        for i in range(3):
+            p.images.append(
+                ProductImage(
+                    url=img(f"{spec['slug']}-{i}"),
+                    alt=f"{spec['name']} view {i + 1}",
+                    sort_order=i,
+                    is_primary=i == 0,
+                )
+            )
+        db.add(p)
+    await db.flush()
+    log.info(
+        "seed_catalog_done", brands=len(brands), categories=len(categories), products=len(PRODUCTS)
+    )
+
+
+async def _seed_families(tax: _Taxonomy) -> None:
+    for name, description in FAMILIES:
+        tax.family(name, description)
+    for note_name in NOTE_FAMILIES:
+        tax.note(note_name)
+
+
+async def _seed_vendors(db, tax: _Taxonomy) -> None:
+    if settings.is_production:
+        log.info("seed_vendors_skipped", reason="never seed demo vendors in production")
+        return
+    if await db.scalar(select(func.count()).select_from(Vendor)):
+        log.info("seed_vendors_skipped", reason="vendors already exist")
+        return
+
+    roles = {r.name: r for r in await db.scalars(select(Role))}
+    categories = {c.slug: c for c in await db.scalars(select(Category))}
+    now = datetime.now(UTC)
+    for spec in VENDORS:
+        owner = await db.scalar(select(User).where(User.email == spec["email"]))
+        if owner is None:
+            owner = User(
+                email=spec["email"],
+                full_name=f"{spec['name']} (owner)",
+                hashed_password=hash_password(DEMO_VENDOR_PASSWORD),
+                is_email_verified=True,
+                roles=[roles["CUSTOMER"]],
+            )
+            db.add(owner)
+        if spec["status"] == VendorStatus.APPROVED:
+            owner.roles.append(roles["VENDOR"])
+        vendor = Vendor(
+            owner=owner,
+            name=spec["name"],
+            slug=spec["slug"],
+            description=spec["description"],
+            logo_url=img(f"vendor-{spec['slug']}", 400, 400),
+            contact_email=spec["email"],
+            tax_id=spec["tax_id"],
+            status=spec["status"],
+            commission_rate=spec["commission"],
+            reviewed_at=now if spec["status"] == VendorStatus.APPROVED else None,
+        )
+        db.add(vendor)
+
+        for item in VENDOR_PRODUCTS.get(spec["slug"], []):
+            ptype = item.get("product_type", "perfume")
+            published = item["status"] == ProductStatus.PUBLISHED
             p = Product(
-                sku=spec["sku"],
-                name=spec["name"],
-                slug=spec["slug"],
-                short_description=spec["short_description"],
-                description=spec["description"],
-                product_type=spec["product_type"],
-                brand=brands[spec["brand"]],
-                category=categories[spec["category"]],
-                base_price=spec["base_price"],
-                compare_at_price=spec["compare_at_price"],
-                is_featured=spec["is_featured"],
-                attributes=spec["attributes"],
-                tags=spec["tags"],
-                rating_avg=Decimal(rating_avg),
-                rating_count=rating_count,
-                status=ProductStatus.PUBLISHED,
-                published_at=now,
+                vendor=vendor,
+                sku=item["sku"],
+                name=item["name"],
+                slug=item["slug"],
+                short_description=item["short"],
+                description=item["short"],
+                product_type=ptype,
+                category=categories.get(item["category"]),
+                base_price=Decimal(item["price"]),
+                attributes=item.get("attrs", {}),
+                tags=[ptype],
+                status=item["status"],
+                submitted_at=now,
+                reviewed_at=now if published else None,
+                published_at=now if published else None,
             )
-            for i, v in enumerate(spec["variants"]):
+            if ptype == "perfume":
+                p.gender = GENDERS[item["gender"]]
+                p.fragrance_family = tax.family(item["family"])
+                p.notes = tax.pyramid(item["notes"])
+                p.attributes = {"concentration": "Attar (perfume oil)"}
+            for i, (ml, mult, stock) in enumerate(item["sizes"]):
                 p.variants.append(
                     ProductVariant(
-                        sku=f"{spec['sku']}-{i + 1}",
-                        name=v["name"],
-                        options=v["options"],
-                        price=v["price"],
-                        compare_at_price=spec["compare_at_price"] if v["default"] else None,
-                        stock_quantity=v["stock"],
-                        is_default=v["default"],
+                        sku=f"{item['sku']}-{ml}",
+                        name=f"{ml} ml",
+                        options={"volume": f"{ml} ml"},
+                        size_ml=Decimal(ml),
+                        price=(Decimal(item["price"]) * Decimal(str(mult))).quantize(Decimal("1")),
+                        stock_quantity=stock,
+                        is_default=i == 0,
                         sort_order=i,
                     )
                 )
-            for i in range(3):
-                p.images.append(
-                    ProductImage(
-                        url=img(f"{spec['slug']}-{i}"),
-                        alt=f"{spec['name']} view {i + 1}",
-                        sort_order=i,
-                        is_primary=i == 0,
-                    )
-                )
+            p.images.append(
+                ProductImage(url=img(item["slug"]), alt=item["name"], sort_order=0, is_primary=True)
+            )
             db.add(p)
+    await db.flush()
+    log.info("seed_vendors_done", vendors=len(VENDORS))
 
-        await db.commit()
-        log.info(
-            "seed_done", brands=len(brands), categories=len(categories), products=len(PRODUCTS)
+
+# Demo reviews for the storefront testimonials (dev only, like the demo vendors).
+DEMO_REVIEWS = [
+    (
+        "Aarati Gurung",
+        "oud-nocturne",
+        5,
+        "Worth every rupee",
+        "Saffron up top, then the oud settles into something warm and quiet. Lasts all day on me "
+        "and I still catch it on my scarf the next morning.",
+    ),
+    (
+        "Rohan Thapa",
+        "mitti-attar",
+        5,
+        "Smells exactly like the first monsoon rain",
+        "I bought it as a curiosity and now I reach for it daily. Two dabs on the wrist is plenty; "
+        "the sandalwood dry-down is beautiful.",
+    ),
+    (
+        "Sneha Maharjan",
+        "rice-ferment-glow-serum",
+        4,
+        "My skin looks rested",
+        "Light, absorbs fast and doesn't pill under sunscreen. A couple of weeks in and my tone "
+        "is noticeably more even.",
+    ),
+    (
+        "Prakash Rai",
+        "shamama-royal-attar",
+        5,
+        "A proper winter fragrance",
+        "Dense, spiced and very long-lasting. It's an oil, so it stays close to the skin, which "
+        "is exactly what I wanted for the office.",
+    ),
+    (
+        "Isha Shrestha",
+        "daily-mineral-sun-fluid-spf50",
+        5,
+        "Finally, no white cast",
+        "I've tried a dozen mineral sunscreens and this is the first that disappears on my skin. "
+        "Wears well under makeup too.",
+    ),
+    (
+        "Nabin K.C.",
+        "oud-nocturne",
+        4,
+        "Beautiful, if a little strong",
+        "Gorgeous rose and oud. I'd go one spray rather than two in summer, but in the evenings "
+        "it's perfect.",
+    ),
+]
+
+
+async def _seed_reviews(db) -> None:
+    if settings.is_production:
+        return
+    if await db.scalar(select(func.count()).select_from(Review)):
+        log.info("seed_reviews_skipped", reason="reviews already exist")
+        return
+    products = {p.slug: p for p in await db.scalars(select(Product))}
+    customer = await db.scalar(select(Role).where(Role.name == "CUSTOMER"))
+    touched = {}
+    for name, slug, rating, title, body in DEMO_REVIEWS:
+        product = products.get(slug)
+        if product is None:
+            continue
+        email = f"{slugify(name, 'shopper')}@shoppers.example.com"
+        user = await db.scalar(select(User).where(User.email == email))
+        if user is None:
+            user = User(email=email, full_name=name, is_email_verified=True, roles=[customer])
+            db.add(user)
+            await db.flush()
+        db.add(
+            Review(
+                product_id=product.id,
+                user_id=user.id,
+                rating=rating,
+                title=title,
+                body=body,
+                author_name=name,
+                is_verified_purchase=False,
+            )
         )
+        touched[product.id] = product
+    await db.flush()
+    for product in touched.values():
+        await recompute_product_rating(db, product)
+    log.info("seed_reviews_done", reviews=len(DEMO_REVIEWS))
+
+
+async def _seed_banners(db) -> None:
+    if await db.scalar(select(func.count()).select_from(Banner)):
+        log.info("seed_banners_skipped", reason="banners already exist")
+        return
+    for i, spec in enumerate(BANNERS):
+        db.add(Banner(image_url=img(f"banner-{i}", 1600, 640), **spec))
+    log.info("seed_banners_done", banners=len(BANNERS))
+
+
+async def seed() -> None:
+    """Each section checks for its own data, so re-running only fills gaps —
+    e.g. a database seeded before vendors existed gets vendors and banners."""
+    configure_logging()
+    async with SessionLocal() as db:
+        tax = _Taxonomy(db)
+        await tax.load()
+        await _seed_families(tax)
+        await _seed_catalog(db, tax)
+        await _seed_vendors(db, tax)
+        await _seed_banners(db)
+        await db.flush()
+        await _seed_reviews(db)
+        await db.commit()
+    await cache.drain()  # let the commit's catalog-cache invalidation finish
+    log.info("seed_done")
 
 
 if __name__ == "__main__":

@@ -31,6 +31,15 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     celery_broker_url: str = "redis://localhost:6379/1"
     celery_result_backend: str = "redis://localhost:6379/2"
+    # Public catalog read cache (Redis). Writes bump a version key; TTL bounds
+    # staleness for what isn't versioned (e.g. stock counts on product pages).
+    cache_enabled: bool = True
+    cache_ttl_seconds: int = 120
+    # Signed-in carts untouched for this long are purged by the nightly beat job.
+    cart_retention_days: int = 90
+    # >0 adds a `system.ping` beat entry every N seconds — dev aid to watch
+    # beat → broker → worker end to end. Leave 0 in production.
+    beat_heartbeat_seconds: int = 0
 
     # Auth
     # Dev-only defaults; ≥32 bytes so HS256 doesn't warn. Must be overridden in production.
@@ -48,6 +57,10 @@ class Settings(BaseSettings):
     #              extend. Carried as the `sst` claim on both token types.
     session_idle_timeout_minutes: int = 40
     session_absolute_timeout_hours: int = 8
+
+    # Payments: the stub gateway stands in for eSewa/Khalti/Stripe in dev and tests.
+    payment_stub_enabled: bool = False
+    payment_stub_secret: str = "dev-only-stub-secret"
 
     # Uploads / media
     upload_dir: str = "uploads"  # relative to apps/api (or absolute)
@@ -98,6 +111,8 @@ class Settings(BaseSettings):
             "dev-only" in self.jwt_secret or "dev-only" in self.jwt_refresh_secret
         ):
             raise ValueError("JWT_SECRET and JWT_REFRESH_SECRET must be set in production")
+        if self.app_env == "production" and self.payment_stub_enabled:
+            raise ValueError("PAYMENT_STUB_ENABLED must be off in production")
         return self
 
     @property

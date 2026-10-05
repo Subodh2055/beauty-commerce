@@ -19,7 +19,7 @@ function SessionNotice({ reason }: { reason: string }) {
   return (
     <p
       role="status"
-      className="rounded-xl border border-gold/40 bg-gold/10 px-3.5 py-2.5 text-sm text-foreground"
+      className="rounded-control border border-gold/40 bg-gold/10 px-3.5 py-2.5 text-sm text-foreground"
     >
       {EXPIRY_NOTICE[reason] ?? EXPIRY_NOTICE.revoked}
     </p>

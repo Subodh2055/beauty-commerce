@@ -181,3 +181,9 @@ async def merge(db: AsyncSession, user_id: uuid.UUID, items: list[CartItemIn]) -
                 db.add(CartItem(user_id=user_id, variant_id=vid, quantity=target, added_at=now))
         await db.commit()
     return await get_cart(db, user_id)
+
+
+async def purge_stale_items(db: AsyncSession, cutoff: datetime) -> int:
+    """Drop cart lines nobody has touched since `cutoff` (nightly beat job)."""
+    result = await db.execute(delete(CartItem).where(CartItem.updated_at < cutoff))
+    return result.rowcount or 0

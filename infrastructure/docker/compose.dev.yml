@@ -9,6 +9,14 @@ x-api-env: &api-env
     CELERY_BROKER_URL: redis://redis:6379/1
     CELERY_RESULT_BACKEND: redis://redis:6379/2
     N8N_BASE_URL: http://n8n:5678
+    # The browser calls the API cross-origin from both :3000 and nginx (:80).
+    CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000},http://localhost
+    # Dev only: beat enqueues system.ping every minute so beat → worker is visible in logs.
+    BEAT_HEARTBEAT_SECONDS: ${BEAT_HEARTBEAT_SECONDS:-60}
+    # Dev only: fake online gateway so eSewa/Khalti/Stripe checkouts can be exercised.
+    PAYMENT_STUB_ENABLED: ${PAYMENT_STUB_ENABLED:-true}
+    # `make test` runs DB-backed tests here; the suite drops and recreates it.
+    TEST_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-beauty}:${POSTGRES_PASSWORD:-beauty}@postgres:5432/${POSTGRES_DB:-beauty_commerce}_test
 
 services:
   postgres:
@@ -55,11 +63,20 @@ services:
       - ../../apps/api/app:/app/app
       - ../../apps/api/alembic:/app/alembic
       - ../../apps/api/tests:/app/tests
+      # Shared with the worker, which writes the WebP renditions.
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      # /ready answers 200 even when degraded, so check the body too.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/v1/health/ready | grep -q '\"status\":\"ok\"'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
 
   worker:
     build:
@@ -68,10 +85,31 @@ services:
     command: celery -A app.workers.celery_app worker --loglevel=info
     volumes:
       - ../../apps/api/app:/app/app
+      - uploads_data:/app/uploads
     depends_on:
       redis:
         condition: service_healthy
       postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping -d celery@$$HOSTNAME --timeout 5"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 30s
+
+  beat:
+    build:
+      context: ../../apps/api
+    <<: *api-env
+    # One beat per deployment, or scheduled jobs run twice.
+    command: celery -A app.workers.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
+    volumes:
+      - ../../apps/api/app:/app/app
+    depends_on:
+      redis:
+        condition: service_healthy
+      worker:
         condition: service_healthy
 
   n8n:
@@ -102,10 +140,39 @@ services:
       - web_node_modules:/app/node_modules
       - web_next:/app/.next
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000/healthz"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      # First request compiles the route.
+      start_period: 90s
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HOST_PORT:-80}:80"
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ../nginx/dev/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../nginx/snippets:/etc/nginx/snippets:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      web:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1/api/v1/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
 volumes:
   postgres_data:
+  uploads_data:
   redis_data:
   n8n_data:
   web_node_modules:

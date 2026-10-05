@@ -1,11 +1,13 @@
 import uuid
+from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.catalog.models import Product, ProductVariant
-from app.modules.orders.models import Order
+from app.modules.orders.models import Order, VendorOrder
 
 
 async def get_variants_for_update(
@@ -48,3 +50,63 @@ async def get_order_for_user(
     db: AsyncSession, order_id: uuid.UUID, user_id: uuid.UUID
 ) -> Order | None:
     return await db.scalar(select(Order).where(Order.id == order_id, Order.user_id == user_id))
+
+
+async def order_totals_by_status(
+    db: AsyncSession, start: datetime, end: datetime
+) -> dict[str, tuple[int, Decimal]]:
+    """`{status: (order_count, sum_of_totals)}` for orders created in [start, end)."""
+    stmt = (
+        select(Order.status, func.count(Order.id), func.coalesce(func.sum(Order.total), 0))
+        .where(Order.created_at >= start, Order.created_at < end)
+        .group_by(Order.status)
+    )
+    return {status: (count, Decimal(total)) for status, count, total in (await db.execute(stmt))}
+
+
+# --- Vendor-scoped access -----------------------------------------------------
+# A vendor reaches order data only through these, always filtered by vendor_id:
+# another vendor's sub-order (or the platform's) is simply not found.
+
+
+async def list_vendor_orders(
+    db: AsyncSession, vendor_id: uuid.UUID, status: str | None, offset: int, limit: int
+) -> tuple[list[VendorOrder], int]:
+    stmt = select(VendorOrder).where(VendorOrder.vendor_id == vendor_id)
+    if status:
+        stmt = stmt.where(VendorOrder.status == status)
+    total = await db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    rows = await db.scalars(
+        stmt.options(selectinload(VendorOrder.order))
+        .order_by(VendorOrder.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    return list(rows.unique().all()), total
+
+
+async def get_vendor_order(
+    db: AsyncSession, vendor_id: uuid.UUID, vendor_order_id: uuid.UUID, *, for_update: bool = False
+) -> VendorOrder | None:
+    stmt = (
+        select(VendorOrder)
+        .where(VendorOrder.id == vendor_order_id, VendorOrder.vendor_id == vendor_id)
+        # Status changes read the sibling sub-orders (sync_parent_status); load them
+        # here — a lazy load inside async code raises MissingGreenlet.
+        .options(selectinload(VendorOrder.order).selectinload(Order.vendor_orders))
+    )
+    if for_update:
+        stmt = stmt.with_for_update(of=VendorOrder)
+    return (await db.scalars(stmt)).unique().first()
+
+
+async def get_order_for_update(db: AsyncSession, order_id: uuid.UUID) -> Order | None:
+    return await db.scalar(select(Order).where(Order.id == order_id).with_for_update())
+
+
+async def user_email(db: AsyncSession, user_id: uuid.UUID | None) -> str | None:
+    from app.modules.users.models import User
+
+    if user_id is None:
+        return None
+    return await db.scalar(select(User.email).where(User.id == user_id))

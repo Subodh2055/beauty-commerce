@@ -5,15 +5,19 @@ import { useEffect, useState } from "react";
 import { useAdmin, type AdminProductRow } from "@/lib/auth";
 import { toast } from "@/lib/toast";
 import { formatMoney } from "@/lib/format";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge, type BadgeTone } from "@/components/ui/badge";
+import { Button, ButtonLink } from "@/components/ui/button";
+import { DataTable, type Column } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/field";
+import { confirmDialog } from "@/components/ui/confirm";
 
-const STATUS_TONE: Record<string, "success" | "gold" | "neutral"> = {
+const STATUS_TONE: Record<string, BadgeTone> = {
   PUBLISHED: "success",
-  DRAFT: "gold",
-  REVIEW: "gold",
-  ARCHIVED: "neutral",
+  DRAFT: "neutral",
+  PENDING: "warning", // awaiting moderation
+  REJECTED: "danger",
+  ARCHIVED: "gold",
 };
 
 export default function AdminProducts() {
@@ -52,7 +56,13 @@ export default function AdminProducts() {
   }
 
   async function onDelete(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This cannot be undone. Order history is kept.`)) return;
+    const ok = await confirmDialog({
+      title: `Delete "${name}"?`,
+      description: "This can't be undone. Order history is kept.",
+      confirmLabel: "Delete product",
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(id);
     try {
       await admin.deleteProduct(id);
@@ -65,94 +75,118 @@ export default function AdminProducts() {
     }
   }
 
+  const columns: Column<AdminProductRow>[] = [
+    {
+      key: "product",
+      header: "Product",
+      cell: (p) => (
+        <>
+          <Link href={`/products/${p.slug}`} className="font-medium transition-colors hover:text-accent">
+            {p.name}
+          </Link>
+          <p className="text-xs text-muted">
+            {p.brand_name ?? "—"} · {p.sku}
+            {p.is_featured && " · featured"}
+          </p>
+        </>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      cell: (p) => <Badge tone={STATUS_TONE[p.status] ?? "neutral"}>{p.status.toLowerCase()}</Badge>,
+    },
+    {
+      key: "price",
+      header: "Price",
+      align: "right",
+      className: "tabular-nums",
+      cell: (p) => formatMoney(p.base_price, p.currency),
+    },
+    {
+      key: "stock",
+      header: "Stock",
+      align: "right",
+      cell: (p) =>
+        p.total_stock <= 5 ? (
+          <span className="font-medium text-danger tabular-nums">
+            {p.total_stock} <span className="sr-only">(low stock)</span>
+          </span>
+        ) : (
+          <span className="tabular-nums">{p.total_stock}</span>
+        ),
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      cell: (p) => (
+        <div className="flex flex-wrap gap-1">
+          <ButtonLink href={`/admin/products/${p.id}`} variant="outline" size="sm" className="h-8! px-3! text-xs">
+            Edit
+          </ButtonLink>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={busy === p.id}
+            onClick={() => patch(p.id, { is_featured: !p.is_featured })}
+            className="h-8! px-3! text-xs"
+          >
+            {p.is_featured ? "Unfeature" : "Feature"}
+          </Button>
+          {p.status === "PUBLISHED" ? (
+            <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => patch(p.id, { status: "ARCHIVED" })} className="h-8! px-3! text-xs">
+              Archive
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => patch(p.id, { status: "PUBLISHED" })} className="h-8! px-3! text-xs">
+              Publish
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy === p.id}
+            onClick={() => onDelete(p.id, p.name)}
+            className="h-8! px-3! text-xs text-danger hover:bg-danger-soft"
+          >
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <input
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Input
           type="search"
+          label="Search products"
+          hideLabel
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search products…"
-          className="focus-ring h-10 w-full max-w-xs rounded-full border border-border bg-surface px-4 text-sm"
+          className="w-full max-w-xs"
+          inputClassName="h-10 rounded-pill px-4"
         />
-        <Link
-          href="/admin/products/new"
-          className="focus-ring inline-flex h-10 items-center gap-1 rounded-full bg-accent px-5 text-sm font-medium text-accent-foreground hover:bg-accent-hover"
-        >
+        <ButtonLink href="/admin/products/new" size="sm" className="h-10!">
           + New product
-        </Link>
+        </ButtonLink>
       </div>
-
-      {!rows ? (
-        <Skeleton className="h-64" />
-      ) : (
-        <div className="overflow-x-auto rounded-2xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-2 text-left text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="p-3">Product</th>
-                <th className="p-3">Status</th>
-                <th className="p-3 text-right">Price</th>
-                <th className="p-3 text-right">Stock</th>
-                <th className="p-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((p) => (
-                <tr key={p.id} className="border-t border-border">
-                  <td className="p-3">
-                    <Link href={`/products/${p.slug}`} className="font-medium hover:text-accent">
-                      {p.name}
-                    </Link>
-                    <p className="text-xs text-muted">
-                      {p.brand_name ?? "—"} · {p.sku}
-                      {p.is_featured && " · ★ featured"}
-                    </p>
-                  </td>
-                  <td className="p-3">
-                    <Badge tone={STATUS_TONE[p.status] ?? "neutral"}>{p.status.toLowerCase()}</Badge>
-                  </td>
-                  <td className="p-3 text-right tabular-nums">{formatMoney(p.base_price, p.currency)}</td>
-                  <td className={`p-3 text-right tabular-nums ${p.total_stock <= 5 ? "text-danger font-medium" : ""}`}>
-                    {p.total_stock}
-                  </td>
-                  <td className="p-3">
-                    <div className="flex flex-wrap gap-1">
-                      <Link
-                        href={`/admin/products/${p.id}`}
-                        className="focus-ring inline-flex h-8 items-center rounded-full border border-border px-3 text-xs hover:bg-surface-2"
-                      >
-                        Edit
-                      </Link>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy === p.id}
-                        onClick={() => patch(p.id, { is_featured: !p.is_featured })}
-                        className="h-8! px-3! text-xs"
-                      >
-                        {p.is_featured ? "Unfeature" : "Feature"}
-                      </Button>
-                      {p.status === "PUBLISHED" ? (
-                        <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => patch(p.id, { status: "ARCHIVED" })} className="h-8! px-3! text-xs">
-                          Archive
-                        </Button>
-                      ) : (
-                        <Button size="sm" variant="outline" disabled={busy === p.id} onClick={() => patch(p.id, { status: "PUBLISHED" })} className="h-8! px-3! text-xs">
-                          Publish
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" disabled={busy === p.id} onClick={() => onDelete(p.id, p.name)} className="h-8! px-3! text-xs text-danger hover:bg-danger/10">
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        caption="Products"
+        columns={columns}
+        rows={rows ?? []}
+        rowKey={(p) => p.id}
+        loading={!rows}
+        empty={
+          <EmptyState
+            compact
+            title={query ? "No matching products" : "No products yet"}
+            description={query ? "Try a different search." : "Create your first product to start selling."}
+          />
+        }
+      />
     </div>
   );
 }

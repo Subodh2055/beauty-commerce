@@ -29,6 +29,7 @@ import {
   type LogoutReason,
 } from "@/lib/session";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 const ACTIVITY_EVENTS = ["pointerdown", "keydown", "scroll", "touchstart", "focus"] as const;
 /** Don't write to localStorage on every mousemove. */
@@ -127,36 +128,32 @@ export function SessionTimeout() {
     void refreshTokens().catch(() => signOut("idle"));
   }, [refreshTokens, signOut]);
 
-  if (!active || warningLeft === null) return null;
-
   return (
-    <div
+    <Modal
+      open={active && warningLeft !== null}
+      onClose={staySignedIn}
       role="alertdialog"
-      aria-modal="true"
-      aria-labelledby="session-timeout-title"
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-    >
-      <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm rounded-3xl border border-border bg-surface p-6 shadow-lift animate-scale-in">
-        <h2 id="session-timeout-title" className="font-serif text-xl font-semibold">
-          Still there?
-        </h2>
-        <p className="mt-2 text-sm text-muted">
+      size="sm"
+      title="Still there?"
+      description={
+        <>
           You&rsquo;ll be signed out in{" "}
           <span className="font-semibold tabular-nums text-foreground">
-            {formatLeft(warningLeft)}
+            {formatLeft(warningLeft ?? 0)}
           </span>{" "}
           for security.
-        </p>
-        <div className="mt-5 flex gap-2">
-          <Button onClick={staySignedIn} className="flex-1">
-            Stay signed in
-          </Button>
+        </>
+      }
+      footer={
+        <>
           <Button variant="outline" onClick={() => signOut("manual")}>
             Sign out
           </Button>
-        </div>
-      </div>
-    </div>
+          <Button onClick={staySignedIn} data-autofocus>
+            Stay signed in
+          </Button>
+        </>
+      }
+    />
   );
 }

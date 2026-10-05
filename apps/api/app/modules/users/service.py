@@ -1,4 +1,4 @@
-"""Address book. Invariant: at most one default address per user, and if the
+"""Profile and address book. Address invariant: at most one default address per user, and if the
 user has any address, exactly one is the default."""
 
 import uuid
@@ -6,9 +6,11 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import NotFoundError
+from app.modules.auth.schemas import UserOut
+from app.modules.auth.service import to_user_out
 from app.modules.users import repository as repo
-from app.modules.users.models import Address
-from app.modules.users.schemas import AddressIn, AddressOut
+from app.modules.users.models import Address, User
+from app.modules.users.schemas import AddressIn, AddressOut, ProfileIn
 
 
 async def list_addresses(db: AsyncSession, user_id: uuid.UUID) -> list[AddressOut]:
@@ -91,3 +93,10 @@ async def set_default(db: AsyncSession, user_id: uuid.UUID, address_id: uuid.UUI
     await db.commit()
     await db.refresh(address)
     return AddressOut.model_validate(address)
+
+
+async def update_profile(db: AsyncSession, user: User, body: ProfileIn) -> UserOut:
+    user.full_name = body.full_name.strip()
+    user.phone = (body.phone or "").strip() or None
+    await db.commit()
+    return to_user_out(user)

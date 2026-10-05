@@ -1,174 +1,361 @@
 @import "tailwindcss";
 
-/* ---------------------------------------------------------------------------
-   Theme tokens. A single bright, premium light theme — used regardless of the
-   OS colour-scheme preference (we intentionally don't switch to dark).
-   Dark tokens remain defined under data-theme="dark" for possible future use,
-   but nothing sets that attribute today.
---------------------------------------------------------------------------- */
+/* ===========================================================================
+   Beauty Commerce design system — "Ink & Champagne"
+   Source of truth: design-system/beauty-commerce/MASTER.md (repo root)
+   Contrast of every text/background pair is checked by `npm run check:contrast`.
 
+   Themes use the class strategy: <html class="dark"> switches every token.
+   Light is the default; the inline script in app/layout.tsx applies the saved
+   choice before first paint, so there is no flash of the wrong theme.
+=========================================================================== */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* --- Colour tokens (light) ------------------------------------------------ */
 :root {
-  --background: #fdfbf8;
-  --background-tint: #f7f0ea;
-  --foreground: #221d1b;
+  color-scheme: light;
+
+  --background: #fbf8f4; /* ivory */
+  --background-tint: #f5eee7;
   --surface: #ffffff;
-  --surface-2: #f4eee8;
-  --muted: #79706a;
-  --border: #ebe3da;
-  --accent: #b03a5b;
-  --accent-hover: #963050;
+  --surface-2: #f3ece5; /* nude */
+  --foreground: #17151f; /* deep ink */
+  --muted: #5f5864; /* secondary text — 4.5:1+ on every surface */
+  --border: #e5dcd2; /* hairlines, decorative */
+  --border-strong: #8a8090; /* form controls — 3:1 non-text contrast */
+
+  --primary: #17151f; /* ink CTA */
+  --primary-hover: #2e2a38;
+  --primary-foreground: #fbf8f4;
+
+  --accent: #9a3f58; /* rose: links, active states, highlights */
+  --accent-hover: #80334a;
   --accent-foreground: #ffffff;
-  --accent-soft: #f7e5ea;
-  --gold: #c69a5b;
-  --gold-soft: #f5ecdd;
-  --success: #2f855a;
-  --danger: #d14343;
-  --ring: #b03a5b;
-  --shadow-color: 28 20 18;
+  --accent-soft: #f6e4e5; /* blush */
+
+  --gold: #9c7a3c; /* champagne for graphics (stars, rules) — 3:1+ */
+  --gold-strong: #765a24; /* champagne text — 4.5:1+ */
+  --gold-soft: #f4ebdb;
+  --nude: #e9d9c8;
+  --blush: #efd5d3;
+
+  --success: #2c6a49;
+  --success-soft: #e3f1e8;
+  --warning: #8a5300;
+  --warning-soft: #f8ecd7;
+  --danger: #b42318;
+  --danger-foreground: #ffffff;
+  --danger-soft: #fbe6e3;
+
+  /* Charts: Okabe–Ito hues (distinguishable with every common colour-vision
+     deficiency); series also differ by shape, never by colour alone. 3:1+ on surfaces. */
+  --chart-1: #0072b2; /* blue */
+  --chart-2: #d55e00; /* vermillion */
+  --chart-3: #00866b; /* bluish green */
+
+  --ring: #9a3f58;
+  --scrim: 23 21 31; /* overlay base, rgb triplet */
+  --shadow-color: 23 21 31;
 }
 
-:root[data-theme="dark"] {
-  --background: #17140f;
-  --background-tint: #1f1a15;
-  --foreground: #f3ece2;
-  --surface: #211c17;
-  --surface-2: #2b241d;
-  --muted: #b0a599;
-  --border: #372f26;
-  --accent: #e79bb2;
-  --accent-hover: #f0b3c5;
-  --accent-foreground: #211c17;
-  --accent-soft: #3a2029;
-  --gold: #dcbc86;
-  --gold-soft: #322a1e;
-  --success: #6cd39a;
-  --danger: #f08a8a;
-  --ring: #e79bb2;
+/* --- Colour tokens (dark) ------------------------------------------------- */
+:root.dark {
+  color-scheme: dark;
+
+  --background: #0f0e14;
+  --background-tint: #15131b;
+  --surface: #18161f;
+  --surface-2: #221f2b;
+  --foreground: #f3ede4;
+  --muted: #aaa2af;
+  --border: #2f2b39;
+  --border-strong: #77707f;
+
+  --primary: #d9be8a; /* champagne CTA on ink */
+  --primary-hover: #e6d0a6;
+  --primary-foreground: #17151f;
+
+  --accent: #e8a3b4;
+  --accent-hover: #f1bbc8;
+  --accent-foreground: #17151f;
+  --accent-soft: #3a2430;
+
+  --gold: #d1b47c;
+  --gold-strong: #e3cb9d;
+  --gold-soft: #2c261a;
+  --nude: #3a332c;
+  --blush: #42292f;
+
+  --success: #7fcfa2;
+  --success-soft: #16291f;
+  --warning: #e9b45f;
+  --warning-soft: #2d2313;
+  --danger: #f39a8f;
+  --danger-foreground: #17151f;
+  --danger-soft: #36191a;
+
+  --chart-1: #56b4e9; /* sky blue */
+  --chart-2: #e69f00; /* orange */
+  --chart-3: #3fc29b; /* bluish green */
+
+  --ring: #d9be8a;
+  --scrim: 0 0 0;
   --shadow-color: 0 0 0;
 }
 
+/* --- Fixed tokens (same in both themes): text laid over photography ------ */
+:root {
+  --image-scrim: 23 21 31; /* ink; 70% keeps white text >= 4.5:1 over any photo */
+  --on-image: #ffffff;
+  /* Cinematic bands (landing brand story) are ink in both themes. */
+  --ink-fixed: #17151f;
+  --champagne-fixed: #d9be8a;
+}
+
+/* --- Motion tokens (plain vars: Tailwind has no duration namespace) ------- */
+:root {
+  --duration-instant: 100ms; /* press feedback */
+  --duration-fast: 160ms; /* hover, colour */
+  --duration-base: 220ms; /* small transitions, toggles */
+  --duration-slow: 360ms; /* overlays in */
+  --duration-slower: 700ms; /* entrances, reveals */
+  --duration-exit: 180ms; /* overlays out — exits are faster than entries */
+}
+
+/* --- Tailwind theme -------------------------------------------------------- */
 @theme inline {
   --color-background: var(--background);
   --color-background-tint: var(--background-tint);
-  --color-foreground: var(--foreground);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-soft: var(--accent-soft);
   --color-gold: var(--gold);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-gold-strong: var(--gold-strong);
   --color-gold-soft: var(--gold-soft);
+  --color-nude: var(--nude);
+  --color-blush: var(--blush);
   --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
   --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-danger-soft: var(--danger-soft);
   --color-ring: var(--ring);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-serif: var(--font-playfair);
+  --color-scrim: rgb(var(--scrim));
+  --color-image-scrim: rgb(var(--image-scrim));
+  --color-on-image: var(--on-image);
+  --color-ink-fixed: var(--ink-fixed);
+  --color-champagne-fixed: var(--champagne-fixed);
+
+  /* Cormorant Garamond for display, Inter for everything you read. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --font-display: var(--font-cormorant), "Cormorant Garamond", Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+@theme {
+  /* Type: smallest UI label (badges, eyebrows). Nothing renders below 11px. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-display: clamp(2.75rem, 1.6rem + 4.6vw, 5.75rem);
+  --text-display--line-height: 1.02;
+
+  /* Letter-spacing for uppercase eyebrows and the serif display. */
+  --tracking-eyebrow: 0.18em;
+  --tracking-display: -0.015em;
+
+  /* Spacing: Tailwind's 4px scale plus named layout rhythm. */
+  --spacing-gutter: 1rem;
+  --spacing-section: 4rem;
+  --spacing-section-lg: 7rem;
+
+  /* Radius: controls are soft, cards generous, buttons pills. */
+  --radius-control: 0.75rem;
+  --radius-card: 1rem;
+  --radius-panel: 1.5rem;
+  --radius-pill: 9999px;
+
+  /* Elevation (tinted by --shadow-color, so it adapts to dark). */
+  --shadow-hairline: 0 0 0 1px rgb(var(--shadow-color) / 0.06);
+  --shadow-soft:
+    0 1px 2px rgb(var(--shadow-color) / 0.04), 0 12px 32px -12px rgb(var(--shadow-color) / 0.14);
+  --shadow-lift:
+    0 2px 4px rgb(var(--shadow-color) / 0.06), 0 24px 48px -16px rgb(var(--shadow-color) / 0.22);
+  --shadow-overlay:
+    0 8px 16px rgb(var(--shadow-color) / 0.08), 0 40px 80px -24px rgb(var(--shadow-color) / 0.38);
+
+  /* Easing. `luxe` is the house curve: quick start, long silky settle. */
+  --ease-luxe: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Named animations (utility classes keep their historical names). */
+  --animate-fade-up: fade-up var(--duration-slower) var(--ease-luxe) both;
+  --animate-fade-in: fade-in 0.8s ease both;
+  --animate-scale-in: scale-in 0.6s var(--ease-luxe) both;
+  --animate-float: float-y 6s ease-in-out infinite;
+  --animate-slide-in-right: slide-in-right var(--duration-slow) var(--ease-luxe) both;
+  --animate-overlay-in: fade-in var(--duration-slow) var(--ease-standard) both;
+  --animate-dialog-in: dialog-in var(--duration-slow) var(--ease-luxe) both;
+  --animate-drawer-in-right: drawer-in-right var(--duration-slow) var(--ease-luxe) both;
+  --animate-drawer-in-left: drawer-in-left var(--duration-slow) var(--ease-luxe) both;
+  --animate-marquee: marquee 32s linear infinite;
+  --animate-spin-slow: spin 0.8s linear infinite;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes drawer-in-right {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  @keyframes drawer-in-left {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: none;
+    }
+  }
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(100%);
+    }
+  }
+}
+
+/* --- Base ------------------------------------------------------------------ */
 html {
   scroll-behavior: smooth;
+}
+/* Lenis (landing page) does its own smoothing; native smoothing would fight it. */
+html.lenis {
+  scroll-behavior: auto;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01"; /* Inter: single-storey a, open digits */
 }
 
-/* Theme transition: recolor smoothly when the toggle flips. */
+/* Cormorant's x-height (~0.40) is much smaller than Inter's or the old Playfair's
+   (~0.51). Normalising it keeps headings at the visual size their classes were
+   tuned for, without resizing each one. */
+.font-serif,
+.font-display {
+  font-size-adjust: ex-height 0.46;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--foreground);
+}
+
+/* Recolour smoothly while the theme toggle flips (class added for ~400ms). */
 :root.theme-anim,
 :root.theme-anim * {
   transition:
     background-color 0.4s ease,
     border-color 0.4s ease,
-    color 0.4s ease;
+    color 0.4s ease !important;
 }
 
-/* ---------------------------------------------------------------------------
-   Motion
---------------------------------------------------------------------------- */
-
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(24px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes float-y {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes shimmer {
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-@keyframes slide-in-right {
-  from {
-    opacity: 0;
-    transform: translateX(16px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-
+/* --- Utilities -------------------------------------------------------------- */
 @layer utilities {
-  .font-serif {
-    font-family: var(--font-serif), Georgia, serif;
-  }
   .container-x {
     @apply mx-auto w-full max-w-[1800px] px-4 sm:px-6 lg:px-10 xl:px-14;
   }
   .focus-ring {
     @apply outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  /* Uppercase micro-heading above section titles. */
+  .eyebrow {
+    @apply text-2xs font-semibold tracking-eyebrow text-accent uppercase;
   }
   .line-clamp-2 {
     display: -webkit-box;
@@ -184,40 +371,13 @@ body {
     scrollbar-width: none;
   }
 
-  /* Soft elevation used by cards and panels. */
-  .shadow-soft {
-    box-shadow: 0 1px 2px rgb(var(--shadow-color) / 0.04),
-      0 12px 32px -12px rgb(var(--shadow-color) / 0.14);
-  }
-  .shadow-lift {
-    box-shadow: 0 2px 4px rgb(var(--shadow-color) / 0.06),
-      0 24px 48px -16px rgb(var(--shadow-color) / 0.22);
-  }
-
-  /* Entrance animations (used directly or via <Reveal>). */
-  .animate-fade-up {
-    animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  .animate-fade-in {
-    animation: fade-in 0.8s ease both;
-  }
-  .animate-scale-in {
-    animation: scale-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-  .animate-float {
-    animation: float-y 6s ease-in-out infinite;
-  }
-  .animate-slide-in-right {
-    animation: slide-in-right 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
-  }
-
   /* Scroll reveal: hidden until [data-show], then eases in. Staggered by index. */
   .reveal {
     opacity: 0;
     transform: translateY(28px);
     transition:
-      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
-      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+      opacity var(--duration-slower) var(--ease-luxe),
+      transform var(--duration-slower) var(--ease-luxe);
     transition-delay: calc(var(--reveal-i, 0) * 70ms);
     will-change: opacity, transform;
   }
@@ -226,7 +386,7 @@ body {
     transform: none;
   }
 
-  /* Shimmer sweep for the skeletons. */
+  /* Shimmer sweep for skeletons. */
   .shimmer {
     position: relative;
     overflow: hidden;
@@ -236,33 +396,106 @@ body {
     position: absolute;
     inset: 0;
     transform: translateX(-100%);
-    background: linear-gradient(
-      90deg,
-      transparent,
-      rgb(var(--shadow-color) / 0.06),
-      transparent
-    );
+    background: linear-gradient(90deg, transparent, rgb(var(--shadow-color) / 0.06), transparent);
     animation: shimmer 1.6s infinite;
   }
 
-  .animate-marquee {
-    animation: marquee 32s linear infinite;
-  }
-
-  /* Animated gradient underline for nav links. */
+  /* Animated underline for nav links. */
   .link-underline {
     background-image: linear-gradient(var(--accent), var(--accent));
     background-size: 0% 1.5px;
     background-position: 0 100%;
     background-repeat: no-repeat;
-    transition: background-size 0.3s ease;
+    transition: background-size var(--duration-base) var(--ease-standard);
   }
   .link-underline:hover {
     background-size: 100% 1.5px;
   }
 }
 
-/* Respect users who prefer less motion. */
+/* --- Landing page ------------------------------------------------------------
+   The hero reveal is CSS, not JS: it starts from the server HTML on first paint,
+   so the headline (the LCP element) never waits for hydration. Everything here
+   animates transform/opacity only. */
+/* Transform only, never opacity: the headline is the LCP element, and Chrome
+   ignores invisible text for LCP, so a fade would hold LCP back until the
+   animation's frames run (behind hydration on slow phones). */
+@keyframes word-rise {
+  from {
+    transform: translateY(0.4em) rotate(1.2deg);
+  }
+  to {
+    transform: none;
+  }
+}
+@keyframes mist-drift {
+  0%,
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) scale(0.9);
+  }
+  20%,
+  80% {
+    opacity: var(--mist-o, 0.5);
+  }
+  50% {
+    transform: translate3d(var(--mist-x, 24px), -60px, 0) scale(1.15);
+  }
+}
+@keyframes scroll-cue {
+  0% {
+    transform: scaleY(0);
+    transform-origin: top;
+  }
+  45% {
+    transform: scaleY(1);
+    transform-origin: top;
+  }
+  55% {
+    transform: scaleY(1);
+    transform-origin: bottom;
+  }
+  100% {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
+}
+
+@layer utilities {
+  .hero-word {
+    display: inline-block;
+    /* Short stagger: the headline is the LCP element, so it must land fast. */
+    animation: word-rise 0.7s var(--ease-luxe) both;
+    animation-delay: calc(40ms + var(--i, 0) * 35ms);
+  }
+  .hero-fade {
+    animation: fade-up var(--duration-slower) var(--ease-luxe) both;
+    animation-delay: var(--d, 0ms);
+  }
+  .mist {
+    animation: mist-drift var(--mist-t, 14s) ease-in-out infinite;
+    animation-delay: var(--mist-d, 0s);
+  }
+  .scroll-cue {
+    animation: scroll-cue 2.4s var(--ease-standard) infinite;
+  }
+
+  /* Testimonials marquee: pauses on hover/focus so it can be read. */
+  .marquee:hover .marquee-track,
+  .marquee:focus-within .marquee-track {
+    animation-play-state: paused;
+  }
+
+  /* Brand story: chapters stack only once the pinned scene is active (JS + motion OK). */
+  .story-active .story-stack {
+    display: grid;
+  }
+  .story-active .story-stack > * {
+    grid-area: 1 / 1;
+  }
+}
+
+/* --- Reduced motion ---------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -277,5 +510,67 @@ body {
   .reveal {
     opacity: 1;
     transform: none;
+  }
+  .mist {
+    display: none;
+  }
+  /* A still marquee becomes a scrollable row; the duplicate copy goes. */
+  .marquee {
+    overflow-x: auto;
+  }
+  .marquee-track {
+    animation: none !important;
+  }
+  .marquee-dup {
+    display: none;
+  }
+}
+
+/* ---------- View transitions (route changes, product image morph) ---------- */
+/* Clicks pass through the transition overlay to the live page. */
+::view-transition {
+  pointer-events: none;
+}
+/* The header is the spatial anchor: it never animates between pages. */
+::view-transition-group(site-header) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(site-header) {
+  display: none;
+}
+::view-transition-new(site-header) {
+  animation: none;
+}
+/* Exits are quicker than entries; the new page waits for the old to clear. */
+::view-transition-old(.page-exit) {
+  animation: vt-fade var(--duration-exit) var(--ease-exit) both reverse;
+}
+::view-transition-new(.page-enter) {
+  animation:
+    vt-fade 240ms var(--ease-standard) var(--duration-exit) both,
+    vt-rise 420ms var(--ease-luxe) both;
+}
+/* Product card image → product page gallery. */
+::view-transition-group(.morph) {
+  animation-duration: 420ms;
+  animation-timing-function: var(--ease-luxe);
+}
+@keyframes vt-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise {
+  from {
+    transform: translateY(12px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

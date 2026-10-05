@@ -1,29 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth, useOrders, type OrderSummary } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
-import { PageHeader } from "@/components/catalog/page-header";
+import { AccountShell } from "@/components/account/account-shell";
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderStatusBadge, PaymentStatusBadge } from "@/components/order/status-badge";
 import { ChevronIcon } from "@/components/ui/icons";
+import { EmptyState } from "@/components/ui/empty-state";
+import { BagIcon } from "@/components/ui/icons";
 
 export default function OrdersPage() {
+  return (
+    <AccountShell title="Your orders" crumbs={[{ href: "/account", label: "Account" }, { href: "/orders", label: "Orders" }]}>
+      <OrderList />
+    </AccountShell>
+  );
+}
+
+function OrderList() {
   const { user, ready } = useAuth();
   const { list } = useOrders();
-  const router = useRouter();
   const [orders, setOrders] = useState<OrderSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!ready) return;
-    if (!user) {
-      router.replace("/login?next=/orders");
-      return;
-    }
+    if (!ready || !user) return;
     let active = true;
     (async () => {
       try {
@@ -41,29 +45,29 @@ export default function OrdersPage() {
     };
     // list() is stable per render; refetch only when auth state changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, user, router]);
+  }, [ready, user]);
 
   return (
-    <div className="container-x py-10">
-      <PageHeader title="Your orders" crumbs={[{ href: "/orders", label: "Orders" }]} />
-
+    <>
       {orders === null ? (
         <div className="space-y-3">
           <Skeleton className="h-24" />
           <Skeleton className="h-24" />
         </div>
       ) : orders.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-border p-16 text-center">
-          <p className="mb-4 text-muted">{error ?? "You haven't placed any orders yet."}</p>
-          <ButtonLink href="/products">Start shopping</ButtonLink>
-        </div>
+        <EmptyState
+          title={error ? "We couldn't load your orders" : "No orders yet"}
+          description={error ?? "When you place an order it will appear here."}
+          icon={<BagIcon width={26} height={26} />}
+          action={<ButtonLink href="/products">Start shopping</ButtonLink>}
+        />
       ) : (
         <ul className="space-y-3">
           {orders.map((o) => (
             <li key={o.id}>
               <Link
                 href={`/orders/${o.id}`}
-                className="group focus-ring flex items-center gap-4 rounded-2xl border border-border bg-surface p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-lift"
+                className="group focus-ring flex items-center gap-4 rounded-card border border-border bg-surface p-5 shadow-soft transition-all hover:-translate-y-0.5 hover:shadow-lift"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -87,6 +91,6 @@ export default function OrdersPage() {
           ))}
         </ul>
       )}
-    </div>
+    </>
   );
 }

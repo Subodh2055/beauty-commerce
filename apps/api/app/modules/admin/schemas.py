@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.modules.catalog.schemas import ImageWriteIn, ProductWriteBase, VariantWriteIn
 from app.shared.enums import OrderStatus, ProductStatus
 
 
@@ -50,6 +51,7 @@ class AdminProductRow(BaseModel):
     currency: str
     product_type: str
     brand_name: str | None = None
+    vendor_name: str | None = None  # None = platform-owned
     total_stock: int
     rating_avg: Decimal
     rating_count: int
@@ -65,45 +67,14 @@ class ProductUpdateIn(BaseModel):
 # --- Full product create / edit ---------------------------------------------
 
 
-class AdminVariantIn(BaseModel):
-    id: uuid.UUID | None = None  # present = update existing, absent = create new
-    name: str = Field(min_length=1, max_length=120)
-    sku: str | None = Field(default=None, max_length=64)  # auto-generated if omitted
-    options: dict[str, str] = Field(default_factory=dict)
-    price: Decimal = Field(gt=0)
-    compare_at_price: Decimal | None = Field(default=None, gt=0)
-    stock_quantity: int = Field(default=0, ge=0)
-    is_default: bool = False
-    sort_order: int = 0
+# Shared with the vendor portal; admin adds status/featured on top.
+AdminVariantIn = VariantWriteIn
+AdminImageIn = ImageWriteIn
 
 
-class AdminImageIn(BaseModel):
-    id: uuid.UUID | None = None
-    url: str = Field(min_length=1, max_length=500)
-    alt: str | None = Field(default=None, max_length=200)
-    is_primary: bool = False
-    sort_order: int = 0
-
-
-class ProductWriteIn(BaseModel):
-    sku: str = Field(min_length=1, max_length=64)
-    name: str = Field(min_length=1, max_length=200)
-    slug: str | None = Field(default=None, max_length=220)  # slugified from name if omitted
-    short_description: str | None = Field(default=None, max_length=300)
-    description: str | None = None
-    product_type: str = Field(min_length=1, max_length=40)
-    brand_id: uuid.UUID | None = None
-    category_id: uuid.UUID | None = None
-    base_price: Decimal = Field(gt=0)
-    compare_at_price: Decimal | None = Field(default=None, gt=0)
-    currency: str = Field(default="NPR", min_length=3, max_length=3)
-    tax_rate: Decimal = Field(default=Decimal("13.00"), ge=0, le=100)
+class ProductWriteIn(ProductWriteBase):
     status: ProductStatus = ProductStatus.DRAFT
     is_featured: bool = False
-    attributes: dict = Field(default_factory=dict)
-    tags: list[str] = Field(default_factory=list)
-    variants: list[AdminVariantIn] = Field(min_length=1)
-    images: list[AdminImageIn] = Field(default_factory=list)
 
 
 class AdminVariantOut(BaseModel):
@@ -113,6 +84,7 @@ class AdminVariantOut(BaseModel):
     name: str
     sku: str
     options: dict
+    size_ml: Decimal | None = None
     price: Decimal
     compare_at_price: Decimal | None = None
     stock_quantity: int
@@ -130,6 +102,14 @@ class AdminImageOut(BaseModel):
     sort_order: int
 
 
+class AdminProductNoteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    note_id: uuid.UUID
+    position: str
+    sort_order: int
+
+
 class AdminProductDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -139,15 +119,24 @@ class AdminProductDetail(BaseModel):
     slug: str
     short_description: str | None = None
     description: str | None = None
+    meta_title: str | None = None
+    meta_description: str | None = None
     product_type: str
     brand_id: uuid.UUID | None = None
     category_id: uuid.UUID | None = None
+    vendor_id: uuid.UUID | None = None
+    gender: str | None = None
+    fragrance_family_id: uuid.UUID | None = None
+    notes: list[AdminProductNoteOut] = Field(default_factory=list)
     base_price: Decimal
     compare_at_price: Decimal | None = None
     currency: str
     tax_rate: Decimal
     status: str
     is_featured: bool
+    submitted_at: datetime | None = None
+    reviewed_at: datetime | None = None
+    rejection_reason: str | None = None
     attributes: dict
     tags: list[str]
     variants: list[AdminVariantOut]

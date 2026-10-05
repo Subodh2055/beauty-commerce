@@ -72,11 +72,12 @@ async def _send_verification_email(user: User) -> None:
 RequestMeta = tuple[str | None, str | None]  # (user_agent, ip)
 
 
-def _to_user_out(user: User) -> UserOut:
+def to_user_out(user: User) -> UserOut:
     return UserOut(
         id=user.id,
         email=user.email,
         full_name=user.full_name,
+        phone=user.phone,
         is_email_verified=user.is_email_verified,
         roles=[r.name for r in user.roles],
     )
@@ -144,7 +145,7 @@ async def register(
     tokens = await _issue_tokens(db, user, meta)
     await db.commit()
     await db.refresh(user, ["roles"])
-    return AuthResult(user=_to_user_out(user), tokens=tokens)
+    return AuthResult(user=to_user_out(user), tokens=tokens)
 
 
 async def login(db: AsyncSession, email: str, password: str, meta: RequestMeta) -> AuthResult:
@@ -162,7 +163,7 @@ async def login(db: AsyncSession, email: str, password: str, meta: RequestMeta) 
     user.last_login_at = datetime.now(UTC)
     tokens = await _issue_tokens(db, user, meta)
     await db.commit()
-    return AuthResult(user=_to_user_out(user), tokens=tokens)
+    return AuthResult(user=to_user_out(user), tokens=tokens)
 
 
 async def refresh(db: AsyncSession, refresh_token: str, meta: RequestMeta) -> TokenPair:

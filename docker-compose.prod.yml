@@ -1,0 +1,8 @@
+# Prod stack entry point: `docker compose -f docker-compose.prod.yml up -d --build`.
+# The services live in infrastructure/docker/compose.prod.yml; see docker-compose.yml
+# for why env_file is set.
+name: beauty-commerce
+
+include:
+  - path: infrastructure/docker/compose.prod.yml
+    env_file: .env

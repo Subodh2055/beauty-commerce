@@ -12,12 +12,13 @@ import {
 } from "@/lib/auth";
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+import { Field, Select as UiSelect, Textarea, controlClass } from "@/components/ui/field";
 import { FormError } from "@/components/auth/auth-card";
 import { TrashIcon, PlusIcon } from "@/components/ui/icons";
 import { ImageUpload } from "./image-upload";
 
-const STATUSES = ["DRAFT", "REVIEW", "PUBLISHED", "ARCHIVED"];
+// PENDING = awaiting moderation (was REVIEW); REJECTED comes back from moderation.
+const STATUSES = ["DRAFT", "PENDING", "PUBLISHED", "REJECTED", "ARCHIVED"];
 const TYPES = ["perfume", "skincare", "lipstick", "foundation", "hair_care", "body_care"];
 
 type VariantRow = AdminVariant;
@@ -145,7 +146,7 @@ export function ProductForm({ existing }: { existing?: AdminProductDetail }) {
     <form onSubmit={onSubmit} className="space-y-8">
       <FormError message={error} />
 
-      <section className="space-y-4 rounded-2xl border border-border bg-surface p-6 shadow-soft">
+      <section className="space-y-4 rounded-card border border-border bg-surface p-6 shadow-soft">
         <h2 className="font-serif text-lg font-semibold">Details</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Name" name="name" value={form.name} onChange={(e) => set("name", e.target.value)} required />
@@ -153,10 +154,7 @@ export function ProductForm({ existing }: { existing?: AdminProductDetail }) {
         </div>
         <Field label="Slug (optional)" name="slug" value={form.slug} onChange={(e) => set("slug", e.target.value)} hint="Auto-generated from the name if left blank." />
         <Field label="Short description" name="short_description" value={form.short_description} onChange={(e) => set("short_description", e.target.value)} />
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium">Description</label>
-          <textarea value={form.description} onChange={(e) => set("description", e.target.value)} rows={4} className="focus-ring w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 text-sm" />
-        </div>
+        <Textarea label="Description" name="description" value={form.description} onChange={(e) => set("description", e.target.value)} rows={4} />
         <div className="grid gap-4 sm:grid-cols-3">
           <Select label="Type" value={form.product_type} onChange={(v) => set("product_type", v)} options={TYPES.map((t) => ({ id: t, name: t.replace("_", " ") }))} />
           <Select label="Brand" value={form.brand_id} onChange={(v) => set("brand_id", v)} options={brands} placeholder="—" />
@@ -170,18 +168,15 @@ export function ProductForm({ existing }: { existing?: AdminProductDetail }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Select label="Status" value={form.status} onChange={(v) => set("status", v)} options={STATUSES.map((s) => ({ id: s, name: s }))} />
           <label className="flex items-end gap-2 pb-2.5 text-sm">
-            <input type="checkbox" checked={form.is_featured} onChange={(e) => set("is_featured", e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" />
+            <input type="checkbox" checked={form.is_featured} onChange={(e) => set("is_featured", e.target.checked)} className="focus-ring h-4 w-4 cursor-pointer accent-accent" />
             Featured
           </label>
         </div>
         <Field label="Tags (comma-separated)" name="tags" value={form.tags} onChange={(e) => set("tags", e.target.value)} />
-        <div className="space-y-1.5">
-          <label className="block text-sm font-medium">Attributes (JSON)</label>
-          <textarea value={form.attributes} onChange={(e) => set("attributes", e.target.value)} rows={6} className="focus-ring w-full rounded-xl border border-border bg-surface px-3.5 py-2.5 font-mono text-xs" />
-        </div>
+        <Textarea label="Attributes (JSON)" name="attributes" value={form.attributes} onChange={(e) => set("attributes", e.target.value)} rows={6} inputClassName="font-mono text-xs" spellCheck={false} />
       </section>
 
-      <section className="space-y-3 rounded-2xl border border-border bg-surface p-6 shadow-soft">
+      <section className="space-y-3 rounded-card border border-border bg-surface p-6 shadow-soft">
         <div className="flex items-center justify-between">
           <h2 className="font-serif text-lg font-semibold">Variants</h2>
           <Button type="button" variant="outline" size="sm" onClick={() => setVariants((vs) => [...vs, emptyVariant()])}>
@@ -190,10 +185,10 @@ export function ProductForm({ existing }: { existing?: AdminProductDetail }) {
         </div>
         <div className="space-y-3">
           {variants.map((v, i) => (
-            <div key={i} className="grid grid-cols-2 gap-2 rounded-xl border border-border p-3 sm:grid-cols-[1.5fr_1fr_1fr_auto_auto]">
-              <input aria-label="Variant name" placeholder="Name (e.g. 50 ml)" value={v.name} onChange={(e) => setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} className="focus-ring h-9 rounded-lg border border-border bg-surface px-2 text-sm" />
-              <input aria-label="Price" type="number" step="0.01" placeholder="Price" value={String(v.price)} onChange={(e) => setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))} className="focus-ring h-9 rounded-lg border border-border bg-surface px-2 text-sm" />
-              <input aria-label="Stock" type="number" placeholder="Stock" value={String(v.stock_quantity)} onChange={(e) => setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, stock_quantity: Number(e.target.value) } : x)))} className="focus-ring h-9 rounded-lg border border-border bg-surface px-2 text-sm" />
+            <div key={i} className="grid grid-cols-2 gap-2 rounded-control border border-border p-3 sm:grid-cols-[1.5fr_1fr_1fr_auto_auto]">
+              <input aria-label="Variant name" placeholder="Name (e.g. 50 ml)" value={v.name} onChange={(e) => setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))} className={`${controlClass} h-9 px-2 text-sm`} />
+              <input aria-label="Price" type="number" step="0.01" placeholder="Price" value={String(v.price)} onChange={(e) => setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, price: e.target.value } : x)))} className={`${controlClass} h-9 px-2 text-sm`} />
+              <input aria-label="Stock" type="number" placeholder="Stock" value={String(v.stock_quantity)} onChange={(e) => setVariants((vs) => vs.map((x, j) => (j === i ? { ...x, stock_quantity: Number(e.target.value) } : x)))} className={`${controlClass} h-9 px-2 text-sm`} />
               <label className="flex items-center gap-1 text-xs">
                 <input type="radio" name="default_variant" checked={v.is_default} onChange={() => setVariants((vs) => vs.map((x, j) => ({ ...x, is_default: j === i })))} />
                 default
@@ -206,7 +201,7 @@ export function ProductForm({ existing }: { existing?: AdminProductDetail }) {
         </div>
       </section>
 
-            <section className="space-y-3 rounded-2xl border border-border bg-surface p-6 shadow-soft">
+            <section className="space-y-3 rounded-card border border-border bg-surface p-6 shadow-soft">
                     <div className="flex items-center justify-between">
                               <h2 className="font-serif text-lg font-semibold">Images</h2>
                                         <Button type="button" variant="outline" size="sm" onClick={() => setImages((im) => [...im, emptyImage()])}>
@@ -216,13 +211,13 @@ export function ProductForm({ existing }: { existing?: AdminProductDetail }) {
                                                                               {images.length === 0 && <p className="text-sm text-muted">No images yet. Add one and upload a file.</p>}
                                                                                       <div className="space-y-3">
                                                                                                 {images.map((im, i) => (
-                                                                                                            <div key={i} className="space-y-3 rounded-xl border border-border p-3">
+                                                                                                            <div key={i} className="space-y-3 rounded-control border border-border p-3">
                                                                                                                           <ImageUpload
                                                                                                                                           value={im.url}
                                                                                                                                                           onChange={(url) => setImages((xs) => xs.map((x, j) => (j === i ? { ...x, url } : x)))}
                                                                                                                                                                         />
                                                                                                                                                                                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
-                                                                                                                                                                                                      <input aria-label="Alt text" placeholder="Alt text (for accessibility)" value={im.alt ?? ""} onChange={(e) => setImages((xs) => xs.map((x, j) => (j === i ? { ...x, alt: e.target.value } : x)))} className="focus-ring h-9 rounded-lg border border-border bg-surface px-2 text-sm" />
+                                                                                                                                                                                                      <input aria-label="Alt text" placeholder="Alt text (for accessibility)" value={im.alt ?? ""} onChange={(e) => setImages((xs) => xs.map((x, j) => (j === i ? { ...x, alt: e.target.value } : x)))} className={`${controlClass} h-9 px-2 text-sm`} />
                                                                                                                                                                                                                       <label className="flex items-center gap-1 text-xs">
                                                                                                                                                                                                                                         <input type="radio" name="primary_image" checked={im.is_primary} onChange={() => setImages((xs) => xs.map((x, j) => ({ ...x, is_primary: j === i })))} />
                                                                                                                                                                                                                                                           primary
@@ -248,6 +243,7 @@ export function ProductForm({ existing }: { existing?: AdminProductDetail }) {
   );
 }
 
+/** Local adapter: this form's {id, name} options onto the shared <Select>. */
 function Select({
   label,
   value,
@@ -262,16 +258,13 @@ function Select({
   placeholder?: string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <label className="block text-sm font-medium">{label}</label>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="focus-ring h-11 w-full rounded-xl border border-border bg-surface px-3 text-sm capitalize">
-        {placeholder !== undefined && <option value="">{placeholder}</option>}
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name}
-          </option>
-        ))}
-      </select>
-    </div>
+    <UiSelect
+      label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      options={options.map((o) => ({ value: o.id, label: o.name }))}
+      placeholder={placeholder}
+      selectClassName="capitalize"
+    />
   );
 }

@@ -4,7 +4,7 @@
 
 .EXAMPLE
   .\scripts\dev-up.ps1            # data services + migrate + seed
-  .\scripts\dev-up.ps1 -Full      # also start api, worker, n8n and web in Docker
+  .\scripts\dev-up.ps1 -Full      # also start the full stack in Docker (via make.ps1 up)
 #>
 param([switch]$Full)
 
@@ -14,7 +14,8 @@ Set-Location $root
 
 if (-not (Test-Path .env)) { Copy-Item .env.example .env; Write-Host "Created .env from .env.example" }
 
-$compose = "docker compose --env-file .env -f infrastructure/docker/compose.dev.yml"
+# Root docker-compose.yml includes infrastructure/docker/compose.dev.yml and reads .env.
+$compose = "docker compose"
 
 Write-Host "==> Starting postgres + redis" -ForegroundColor Cyan
 Invoke-Expression "$compose up -d --wait postgres redis"
@@ -32,9 +33,9 @@ Write-Host "==> Seeding catalog" -ForegroundColor Cyan
 Set-Location $root
 
 if ($Full) {
-  Write-Host "==> Starting api, worker, n8n, web in Docker" -ForegroundColor Cyan
-  Invoke-Expression "$compose up -d --build api worker n8n web"
-  Write-Host "Web: http://localhost:3000   API docs: http://localhost:8000/docs   n8n: http://localhost:5678"
+  Write-Host "==> Starting the full stack in Docker" -ForegroundColor Cyan
+  & "$root\make.ps1" up
+  Write-Host "Site (nginx): http://localhost   Web: http://localhost:3000   API docs: http://localhost:8000/docs   n8n: http://localhost:5678"
 } else {
   Write-Host ""
   Write-Host "Data services are up. Now run in two terminals:" -ForegroundColor Green

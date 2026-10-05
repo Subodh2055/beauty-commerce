@@ -2,8 +2,18 @@
 
 Checkout is one transaction: re-price every line from the DB (never trust the
 client), lock and validate stock, decrement it, snapshot line items + address,
+split the lines into one VendorOrder per seller with its commission snapshot,
 create the order, its first status event and a payment row. Any failure rolls
 the whole thing back so stock is never left decremented without an order.
+
+Status flows both ways between an order and its vendor sub-orders:
+- down: admin/payment changes to the order apply to every sub-order
+  (`apply_status_to_vendor_orders`);
+- up: vendors ship/deliver their own sub-order, and the order follows once all
+  live sub-orders agree (`sync_parent_status`).
+
+Commission is charged on each seller's line subtotal. Coupons and shipping are
+platform-level, so a discount is funded by the platform, not the vendor.
 """
 
 import uuid
@@ -25,15 +35,31 @@ from app.modules.orders.models import (
     OrderItem,
     OrderStatusHistory,
     Payment,
+    VendorOrder,
 )
-from app.modules.orders.schemas import CheckoutIn, CheckoutResult, OrderDetail, OrderSummary
-from app.shared.enums import InventoryReason, OrderStatus, PaymentMethod, PaymentStatus
+from app.modules.orders.schemas import (
+    CheckoutIn,
+    CheckoutResult,
+    OrderDetail,
+    OrderSummary,
+    VendorOrderOut,
+    VendorOrderStatusIn,
+)
+from app.modules.settings import service as settings_service
+from app.modules.settings.schemas import PlatformSettings
+from app.modules.vendors.models import Vendor
+from app.shared.enums import (
+    InventoryReason,
+    OrderStatus,
+    PaymentMethod,
+    PaymentStatus,
+    VendorOrderStatus,
+    VendorStatus,
+)
 from app.shared.pagination import Page, PageParams
 
 log = get_logger(__name__)
 
-FREE_SHIPPING_THRESHOLD = Decimal("5000")
-SHIPPING_FEE = Decimal("150")
 Q = Decimal("0.01")
 
 
@@ -68,15 +94,20 @@ async def checkout(
     if missing:
         raise NotFoundError(f"Some items are no longer available: {', '.join(missing)}")
 
+    platform = await settings_service.get_settings(db)
     subtotal = Decimal("0")
     tax_total = Decimal("0")
     items: list[OrderItem] = []
+    by_seller: dict[uuid.UUID | None, list[OrderItem]] = {}
+    sellers: dict[uuid.UUID, Vendor] = {}
 
     for variant_id, qty in wanted.items():
         v = variants[variant_id]
         product = v.product
         if product is None or product.status != "PUBLISHED":
             raise ConflictError(f"'{v.name}' is not available for purchase")
+        if product.vendor is not None and product.vendor.status != VendorStatus.APPROVED:
+            raise ConflictError(f"'{product.name}' is not available for purchase")
         if v.stock_quantity < qty:
             raise ConflictError(
                 f"Only {v.stock_quantity} of '{product.name} — {v.name}' left in stock"
@@ -93,20 +124,22 @@ async def checkout(
         primary_image = next((i for i in product.images if i.is_primary), None) or (
             product.images[0] if product.images else None
         )
-        items.append(
-            OrderItem(
-                product_id=product.id,
-                variant_id=v.id,
-                product_name=product.name,
-                variant_name=v.name,
-                sku=v.sku,
-                image_url=primary_image.url if primary_image else None,
-                slug=product.slug,
-                unit_price=unit_price,
-                quantity=qty,
-                line_total=line_total,
-            )
+        item = OrderItem(
+            product_id=product.id,
+            variant_id=v.id,
+            product_name=product.name,
+            variant_name=v.name,
+            sku=v.sku,
+            image_url=primary_image.url if primary_image else None,
+            slug=product.slug,
+            unit_price=unit_price,
+            quantity=qty,
+            line_total=line_total,
         )
+        items.append(item)
+        by_seller.setdefault(product.vendor_id, []).append(item)
+        if product.vendor is not None:
+            sellers[product.vendor.id] = product.vendor
 
     subtotal = subtotal.quantize(Q)
 
@@ -118,7 +151,9 @@ async def checkout(
             db, body.coupon_code, subtotal, user_id
         )
 
-    shipping_fee = Decimal("0") if subtotal >= FREE_SHIPPING_THRESHOLD else SHIPPING_FEE
+    shipping_fee = (
+        Decimal("0") if subtotal >= platform.free_shipping_threshold else platform.shipping_fee
+    )
     # Prices are VAT-inclusive, so tax is reported, not added on top.
     total = (subtotal - discount_total + shipping_fee).quantize(Q)
 
@@ -152,6 +187,13 @@ async def checkout(
         customer_note=body.customer_note,
     )
     order.items = items
+    sub_status = (
+        VendorOrderStatus.PROCESSING if method == PaymentMethod.COD else VendorOrderStatus.PENDING
+    )
+    for vendor_id, lines in by_seller.items():
+        order.vendor_orders.append(
+            _vendor_order(vendor_id, sellers.get(vendor_id), lines, sub_status, platform)
+        )
     order.history.append(
         OrderStatusHistory(
             status=order_status,
@@ -204,6 +246,61 @@ async def checkout(
     )
 
 
+def _vendor_order(
+    vendor_id: uuid.UUID | None,
+    vendor: "Vendor | None",
+    lines: list[OrderItem],
+    status: str,
+    platform: PlatformSettings,
+) -> VendorOrder:
+    """One seller's share with its money split. The rate is snapshotted: later
+    commission changes never alter what this sale owes the vendor."""
+    sub = sum((i.line_total for i in lines), Decimal("0")).quantize(Q)
+    if vendor is None:
+        rate, commission, earnings = None, Decimal("0"), Decimal("0")
+    else:
+        rate = (
+            vendor.commission_rate
+            if vendor.commission_rate is not None
+            else platform.default_commission_rate
+        )
+        commission = (sub * Decimal(rate) / Decimal(100)).quantize(Q)
+        earnings = sub - commission
+    return VendorOrder(
+        vendor_id=vendor_id,
+        status=status,
+        subtotal=sub,
+        commission_rate=rate,
+        commission_amount=commission,
+        vendor_earnings=earnings,
+        items=lines,
+    )
+
+
+async def restock_order(
+    db: AsyncSession, order: Order, *, note: str, created_by: uuid.UUID | None = None
+) -> None:
+    """Return every line's quantity to stock (locked) with a ledger entry.
+    Caller owns the transaction and the order's status change."""
+    variant_ids = [i.variant_id for i in order.items if i.variant_id]
+    if not variant_ids:
+        return
+    locked = await repo.get_variants_for_update(db, variant_ids)
+    for item in order.items:
+        v = locked.get(item.variant_id) if item.variant_id else None
+        if v is not None:
+            v.stock_quantity += item.quantity
+            inventory_service.record(
+                db,
+                v,
+                item.quantity,
+                InventoryReason.CANCEL,
+                order_id=order.id,
+                note=note,
+                created_by=created_by,
+            )
+
+
 async def list_my_orders(
     db: AsyncSession, user_id: uuid.UUID, page: PageParams
 ) -> Page[OrderSummary]:
@@ -226,26 +323,17 @@ async def cancel_my_order(
         raise NotFoundError("Order not found")
     if order.status not in CANCELLABLE:
         raise ValidationFailedError(f"An order that is {order.status} can no longer be cancelled")
+    if any(
+        vo.status in (VendorOrderStatus.SHIPPED, VendorOrderStatus.DELIVERED)
+        for vo in order.vendor_orders
+    ):
+        raise ValidationFailedError("Part of this order has already shipped; contact support")
 
-    # Restock and lock the variants back.
-    variant_ids = [i.variant_id for i in order.items if i.variant_id]
-    if variant_ids:
-        locked = await repo.get_variants_for_update(db, variant_ids)
-        for item in order.items:
-            v = locked.get(item.variant_id) if item.variant_id else None
-            if v is not None:
-                v.stock_quantity += item.quantity
-                inventory_service.record(
-                    db,
-                    v,
-                    item.quantity,
-                    InventoryReason.CANCEL,
-                    order_id=order.id,
-                    note="Order cancelled",
-                )
+    await restock_order(db, order, note="Order cancelled")
 
     order.status = OrderStatus.CANCELLED
     order.payment_status = PaymentStatus.FAILED
+    apply_status_to_vendor_orders(order, OrderStatus.CANCELLED)
     order.history.append(
         OrderStatusHistory(
             status=OrderStatus.CANCELLED, note="Cancelled by customer", created_at=_now()
@@ -255,3 +343,142 @@ async def cancel_my_order(
     await db.refresh(order)
     await notifications_service.order_status_changed(db, order, user_email)
     return OrderDetail.model_validate(order)
+
+
+# --- Order <-> vendor sub-order status ----------------------------------------
+
+_CLOSED = {VendorOrderStatus.CANCELLED, VendorOrderStatus.REFUNDED}
+
+
+def apply_status_to_vendor_orders(order: Order, status: str) -> None:
+    """Push an order-level status change down to its live sub-orders."""
+    now = _now()
+    for vo in order.vendor_orders:
+        if status == OrderStatus.REFUNDED:
+            vo.status = VendorOrderStatus.REFUNDED
+        elif vo.status in _CLOSED:
+            continue
+        elif status in (OrderStatus.CANCELLED, OrderStatus.PAYMENT_FAILED):
+            vo.status = VendorOrderStatus.CANCELLED
+        elif status in (OrderStatus.PAID, OrderStatus.PROCESSING):
+            if vo.status == VendorOrderStatus.PENDING:
+                vo.status = VendorOrderStatus.PROCESSING
+        elif status == OrderStatus.SHIPPED:
+            if vo.status in (
+                VendorOrderStatus.PENDING,
+                VendorOrderStatus.PROCESSING,
+                VendorOrderStatus.PACKED,
+            ):
+                vo.status, vo.shipped_at = VendorOrderStatus.SHIPPED, vo.shipped_at or now
+        elif status == OrderStatus.DELIVERED:
+            vo.status = VendorOrderStatus.DELIVERED
+            vo.shipped_at = vo.shipped_at or now
+            vo.delivered_at = vo.delivered_at or now
+
+
+def sync_parent_status(order: Order) -> str | None:
+    """Advance the order once every live sub-order has shipped/delivered.
+    Returns the new status, or None if nothing changed."""
+    live = [vo for vo in order.vendor_orders if vo.status not in _CLOSED]
+    if not live:
+        return None
+    new: str | None = None
+    if all(vo.status == VendorOrderStatus.DELIVERED for vo in live):
+        if order.status in (OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.SHIPPED):
+            new = OrderStatus.DELIVERED
+    elif all(vo.status in (VendorOrderStatus.SHIPPED, VendorOrderStatus.DELIVERED) for vo in live):
+        if order.status in (OrderStatus.PAID, OrderStatus.PROCESSING):
+            new = OrderStatus.SHIPPED
+    if new is not None:
+        order.status = new
+        order.history.append(
+            OrderStatusHistory(status=new, note=f"All items {new.lower()}", created_at=_now())
+        )
+    return new
+
+
+# --- Vendor portal ------------------------------------------------------------
+
+# The seller's pipeline: new (PROCESSING) → packed → shipped → delivered. Packing is
+# optional, so a new order may also go straight to shipped.
+VENDOR_TRANSITIONS: dict[str, set[str]] = {
+    VendorOrderStatus.PROCESSING: {VendorOrderStatus.PACKED, VendorOrderStatus.SHIPPED},
+    VendorOrderStatus.PACKED: {VendorOrderStatus.SHIPPED},
+    VendorOrderStatus.SHIPPED: {VendorOrderStatus.DELIVERED},
+}
+
+
+def to_vendor_order_out(vo: VendorOrder) -> VendorOrderOut:
+    o = vo.order
+    return VendorOrderOut(
+        id=vo.id,
+        order_number=o.order_number,
+        created_at=vo.created_at,
+        status=vo.status,
+        payment_status=o.payment_status,
+        subtotal=vo.subtotal,
+        commission_rate=vo.commission_rate,
+        commission_amount=vo.commission_amount,
+        vendor_earnings=vo.vendor_earnings,
+        tracking_number=vo.tracking_number,
+        shipped_at=vo.shipped_at,
+        delivered_at=vo.delivered_at,
+        paid_out=vo.payout_id is not None,
+        items=vo.items,
+        ship_recipient=o.ship_recipient,
+        ship_phone=o.ship_phone,
+        ship_line1=o.ship_line1,
+        ship_line2=o.ship_line2,
+        ship_city=o.ship_city,
+        ship_state=o.ship_state,
+        ship_postal_code=o.ship_postal_code,
+        ship_country=o.ship_country,
+    )
+
+
+async def list_vendor_orders(
+    db: AsyncSession, vendor_id: uuid.UUID, status: str | None, page: PageParams
+) -> Page[VendorOrderOut]:
+    rows, total = await repo.list_vendor_orders(db, vendor_id, status, page.offset, page.size)
+    return Page(
+        items=[to_vendor_order_out(vo) for vo in rows],
+        total=total,
+        page=page.page,
+        size=page.size,
+    )
+
+
+async def get_vendor_order(
+    db: AsyncSession, vendor_id: uuid.UUID, vendor_order_id: uuid.UUID
+) -> VendorOrderOut:
+    vo = await repo.get_vendor_order(db, vendor_id, vendor_order_id)
+    if vo is None:
+        raise NotFoundError("Order not found")
+    return to_vendor_order_out(vo)
+
+
+async def update_vendor_order_status(
+    db: AsyncSession,
+    vendor_id: uuid.UUID,
+    vendor_order_id: uuid.UUID,
+    body: VendorOrderStatusIn,
+) -> VendorOrderOut:
+    vo = await repo.get_vendor_order(db, vendor_id, vendor_order_id, for_update=True)
+    if vo is None:
+        raise NotFoundError("Order not found")
+    if body.status not in VENDOR_TRANSITIONS.get(vo.status, set()):
+        raise ValidationFailedError(f"Cannot move this order from {vo.status} to {body.status}")
+    now = _now()
+    vo.status = body.status
+    if body.status == VendorOrderStatus.SHIPPED:
+        vo.shipped_at = now
+        vo.tracking_number = body.tracking_number or vo.tracking_number
+    elif body.status == VendorOrderStatus.DELIVERED:
+        vo.delivered_at = now
+    order = vo.order
+    changed = sync_parent_status(order)
+    await db.commit()
+    if changed:
+        email = await repo.user_email(db, order.user_id)
+        await notifications_service.order_status_changed(db, order, email)
+    return to_vendor_order_out(vo)

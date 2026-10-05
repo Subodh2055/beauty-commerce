@@ -4,8 +4,8 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ApiRequestError, getBrand } from "@/lib/api";
 import { PageHeader } from "@/components/catalog/page-header";
-import { ProductListing, parseQuery } from "@/components/catalog/product-listing";
-import { ProductGridSkeleton } from "@/components/ui/skeleton";
+import { ProductListing, parseQuery, parseView } from "@/components/catalog/product-listing";
+import { ListingSkeleton } from "@/components/ui/skeleton";
 
 async function loadBrand(slug: string) {
   try {
@@ -26,6 +26,7 @@ export default async function BrandPage(props: PageProps<"/brands/[slug]">) {
   const [{ slug }, sp] = await Promise.all([props.params, props.searchParams]);
   const brand = await loadBrand(slug);
   const query = parseQuery(sp, { brand: slug });
+  const view = parseView(sp);
 
   return (
     <div className="container-x py-10">
@@ -44,8 +45,8 @@ export default async function BrandPage(props: PageProps<"/brands/[slug]">) {
           ) : null
         }
       />
-      <Suspense key={JSON.stringify(query)} fallback={<ProductGridSkeleton />}>
-        <ProductListing query={query} pathname={`/brands/${slug}`} lock={{ brand: true }} />
+      <Suspense key={JSON.stringify(query) + view} fallback={<ListingSkeleton view={view} />}>
+        <ProductListing query={query} view={view} pathname={`/brands/${slug}`} lock={{ brand: true }} />
       </Suspense>
     </div>
   );
