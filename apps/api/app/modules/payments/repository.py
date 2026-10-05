@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.orders.models import Payment
+from app.modules.orders.models import Order, Payment
 from app.modules.payments.models import PaymentEvent
 
 
@@ -44,3 +44,21 @@ async def get_payment_for_update(db: AsyncSession, provider_ref: str) -> Payment
     return await db.scalar(
         select(Payment).where(Payment.provider_ref == provider_ref).with_for_update()
     )
+
+
+async def get_user_payment(
+    db: AsyncSession, provider_ref: str, user_id: uuid.UUID
+) -> tuple[Payment, Order] | None:
+    """A payment and its order, only if that order belongs to `user_id`."""
+    row = (
+        (
+            await db.execute(
+                select(Payment, Order)
+                .join(Order, Order.id == Payment.order_id)
+                .where(Payment.provider_ref == provider_ref, Order.user_id == user_id)
+            )
+        )
+        .unique()
+        .first()
+    )
+    return (row[0], row[1]) if row else None
