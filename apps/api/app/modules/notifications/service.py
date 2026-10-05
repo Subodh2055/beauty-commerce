@@ -13,8 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from app.integrations import notifications as transport
 from app.modules.notifications.models import Notification
-from app.modules.notifications.templates import render
+from app.modules.notifications.templates import render, render_override
 from app.modules.orders.models import Order
+from app.modules.settings import service as settings_service
 from app.shared.enums import NotificationStatus
 from app.shared.pagination import Page, PageParams
 
@@ -49,7 +50,11 @@ async def emit_order_event(
 ) -> None:
     try:
         payload = _order_payload(order)
-        subject, text, html = render(event, payload)
+        override = (await settings_service.get_settings(db)).email_templates.get(event)
+        if override is not None and override.enabled:
+            subject, text, html = render_override(event, payload, override.subject, override.body)
+        else:
+            subject, text, html = render(event, payload)
 
         result = await transport.dispatch(event, payload, recipient_email, subject, html, text)
 
