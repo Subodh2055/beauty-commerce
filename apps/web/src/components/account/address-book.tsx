@@ -53,19 +53,29 @@ export function AddressBook() {
   async function remove(id: string) {
     const ok = await confirmDialog({ title: "Delete this address?", confirmLabel: "Delete", tone: "danger" });
     if (!ok) return;
+    // Optimistic: drop it now, put it back if the server refuses.
+    const before = items;
+    setItems((list) => list?.filter((a) => a.id !== id) ?? null);
     try {
       await api.remove(id);
-      await refresh();
       toast.info("Address deleted");
+      await refresh(); // the server may have promoted a new default
     } catch (err) {
+      setItems(before);
       toast.error(err instanceof Error ? err.message : "Could not delete");
     }
   }
 
   async function setDefault(id: string) {
-    await api.setDefault(id);
-    await refresh();
-    toast.success("Default address updated");
+    const before = items;
+    setItems((list) => list?.map((a) => ({ ...a, is_default: a.id === id })) ?? null);
+    try {
+      await api.setDefault(id);
+      toast.success("Default address updated");
+    } catch (err) {
+      setItems(before);
+      toast.error(err instanceof Error ? err.message : "Could not update");
+    }
   }
 
   if (!items) return <Skeleton className="h-40" />;

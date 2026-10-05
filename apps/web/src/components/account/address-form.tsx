@@ -119,7 +119,8 @@ export function AddressCard({
       <button
         type="button"
         onClick={onSelect}
-        className={`focus-ring w-full rounded-card border p-4 text-left transition-colors ${
+        aria-pressed={selected}
+        className={`focus-ring w-full cursor-pointer rounded-card border p-4 text-left transition-colors ${
           selected ? "border-accent bg-accent-soft/40" : "border-border hover:border-foreground/30"
         }`}
       >
