@@ -33,12 +33,36 @@ export interface AuthUser {
   phone?: string | null;
   is_email_verified: boolean;
   roles: string[];
+  /** Effective permission codes from the API (see apps/api/app/shared/permissions.py).
+   *  Older stored sessions may lack it until the next /auth/me refresh. */
+  permissions?: string[];
 }
 
 export const ADMIN_ROLES = ["STAFF", "ADMIN", "SUPER_ADMIN"];
+/** Codes a non-staff account can hold; anything else means admin-area access. */
+const NON_ADMIN_CODES = new Set(["vendor.portal", "media.upload"]);
 
-export function isAdmin(user: Pick<AuthUser, "roles"> | null | undefined): boolean {
-  return !!user && user.roles.some((r) => ADMIN_ROLES.includes(r));
+export function isAdmin(
+  user: Pick<AuthUser, "roles" | "permissions"> | null | undefined,
+): boolean {
+  if (!user) return false;
+  if (user.roles.some((r) => ADMIN_ROLES.includes(r))) return true;
+  // Custom staff roles (created in /super-admin) are recognised by what they grant.
+  return (user.permissions ?? []).some((p) => !NON_ADMIN_CODES.has(p));
+}
+
+export function isSuperAdmin(user: Pick<AuthUser, "roles"> | null | undefined): boolean {
+  return !!user && user.roles.includes("SUPER_ADMIN");
+}
+
+/** Mirrors the API's check. The API still enforces every call; this only hides
+ *  what would be refused. */
+export function hasPermission(
+  user: Pick<AuthUser, "roles" | "permissions"> | null | undefined,
+  code: string,
+): boolean {
+  if (!user) return false;
+  return isSuperAdmin(user) || (user.permissions ?? []).includes(code);
 }
 
 /** Where a user should land after signing in, based on role. */
@@ -203,6 +227,15 @@ const actions = {
     setSession({ ...s, ...t, session_started_at: sessionStartedAt(t.access_token) });
   },
 
+  /** Re-read the signed-in user (roles and permissions may have changed). */
+  async refreshUser(): Promise<AuthUser | null> {
+    const res = await actions.authFetch("/auth/me");
+    if (!res.ok) return null;
+    const user = (await res.json()) as AuthUser;
+    actions.setUser(user);
+    return user;
+  },
+
   /** Swap in a fresh user record (after a profile edit) without touching tokens. */
   setUser(user: AuthUser) {
     const s = getSnapshot().session;
@@ -262,6 +295,7 @@ export interface AuthApi {
   refreshTokens: typeof actions.refreshTokens;
   expire: typeof actions.expire;
   setUser: typeof actions.setUser;
+  refreshUser: typeof actions.refreshUser;
   accessToken: string | null;
   register: typeof actions.register;
   login: typeof actions.login;
@@ -316,6 +350,8 @@ export interface CheckoutItem {
 }
 
 export interface OrderItem {
+  /** Line id (needed to ask for a return). */
+  id?: string;
   product_name: string;
   variant_name: string;
   sku: string;
