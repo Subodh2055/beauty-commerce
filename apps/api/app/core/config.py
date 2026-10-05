@@ -37,9 +37,10 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 120
     # Signed-in carts untouched for this long are purged by the nightly beat job.
     cart_retention_days: int = 90
-    # >0 adds a `system.ping` beat entry every N seconds — dev aid to watch
-    # beat → broker → worker end to end. Leave 0 in production.
-    beat_heartbeat_seconds: int = 0
+    # >0 adds a `system.ping` beat entry every N seconds. It stamps Redis, which
+    # is how the super-admin system-health page knows beat → broker → worker is
+    # flowing. 0 disables it (the page then reports beat as "not monitored").
+    beat_heartbeat_seconds: int = 60
 
     # Auth
     # Dev-only defaults; ≥32 bytes so HS256 doesn't warn. Must be overridden in production.
