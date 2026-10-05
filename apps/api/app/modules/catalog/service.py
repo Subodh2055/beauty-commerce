@@ -47,6 +47,11 @@ def _primary_image(p: Product):
     return next((i for i in p.images if i.is_primary), p.images[0])
 
 
+def primary_image_url(p: Product) -> str | None:
+    img = _primary_image(p)
+    return img.url if img else None
+
+
 def to_summary(p: Product) -> ProductSummary:
     return ProductSummary(
         id=p.id,
@@ -91,6 +96,8 @@ def to_detail(p: Product) -> ProductDetail:
     return ProductDetail(
         **summary.model_dump(),
         description=p.description,
+        meta_title=p.meta_title,
+        meta_description=p.meta_description,
         tax_rate=p.tax_rate,
         attributes=dict(p.attributes or {}),
         notes=_pyramid(p),
@@ -164,6 +171,17 @@ async def related_products(db: AsyncSession, slug: str) -> list[ProductSummary]:
         return [to_summary(r) for r in await repo.related_products(db, p)] if p else None
 
     rows = await cache.get_or_load(CACHE_NS, cache.make_key("related", slug), _SUMMARIES, load)
+    if rows is None:
+        raise NotFoundError(f"Product '{slug}' not found")
+    return rows
+
+
+async def similar_scents(db: AsyncSession, slug: str) -> list[ProductSummary]:
+    async def load() -> list[ProductSummary] | None:
+        p = await repo.get_product_by_slug(db, slug)
+        return [to_summary(r) for r in await repo.similar_scents(db, p)] if p else None
+
+    rows = await cache.get_or_load(CACHE_NS, cache.make_key("similar", slug), _SUMMARIES, load)
     if rows is None:
         raise NotFoundError(f"Product '{slug}' not found")
     return rows
@@ -409,6 +427,8 @@ async def apply_write(db: AsyncSession, product: Product, body: ProductWriteBase
     product.name = body.name
     product.short_description = body.short_description
     product.description = body.description
+    product.meta_title = (body.meta_title or "").strip() or None
+    product.meta_description = (body.meta_description or "").strip() or None
     product.product_type = body.product_type
     product.brand_id = body.brand_id
     product.category_id = body.category_id
