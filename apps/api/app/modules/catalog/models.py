@@ -139,6 +139,9 @@ class Product(UUIDMixin, TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(String(220), unique=True, index=True, nullable=False)
     short_description: Mapped[str | None] = mapped_column(String(300))
     description: Mapped[str | None] = mapped_column(Text)
+    # Search snippet overrides; the storefront falls back to name/short description.
+    meta_title: Mapped[str | None] = mapped_column(String(70))
+    meta_description: Mapped[str | None] = mapped_column(String(170))
     product_type: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
 
     brand_id: Mapped[uuid.UUID | None] = mapped_column(
