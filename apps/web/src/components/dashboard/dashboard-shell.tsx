@@ -11,12 +11,16 @@ export interface DashboardNavItem {
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
   /** Small count shown next to the label (e.g. orders to ship). */
   badge?: number;
+  /** Sidebar section heading (shown from lg); consecutive items share it. */
+  group?: string;
 }
 
 /**
  * Frame shared by the admin and vendor dashboards: title row, section nav
  * (sidebar from lg, scrollable pills below), optional banner, content.
  * Access checks belong to the caller; pass `ready={false}` to show the skeleton.
+ * `variant="platform"` is the super-admin area: violet active state, so it can
+ * never be mistaken for the everyday admin.
  */
 export function DashboardShell({
   title,
@@ -26,6 +30,7 @@ export function DashboardShell({
   aside,
   banner,
   children,
+  variant = "default",
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
@@ -35,6 +40,7 @@ export function DashboardShell({
   aside?: ReactNode;
   banner?: ReactNode;
   children: ReactNode;
+  variant?: "default" | "platform";
 }) {
   const pathname = usePathname();
   const navRef = useRef<HTMLElement>(null);
@@ -84,16 +90,26 @@ export function DashboardShell({
       <div className="grid gap-6 lg:grid-cols-[200px_1fr] lg:gap-8">
         <nav ref={navRef} aria-label="Dashboard" className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:overflow-visible lg:px-0">
           <ul className="flex gap-1 lg:sticky lg:top-24 lg:flex-col">
-            {nav.map((item) => {
+            {nav.map((item, i) => {
               const on = active(item.href);
               const Icon = item.icon;
+              const heading = item.group && item.group !== nav[i - 1]?.group ? item.group : null;
               return (
                 <li key={item.href} className="shrink-0">
+                  {heading && (
+                    <p className="mt-4 mb-1 hidden px-3.5 text-2xs font-semibold tracking-eyebrow text-muted uppercase lg:block">
+                      {heading}
+                    </p>
+                  )}
                   <Link
                     href={item.href}
                     aria-current={on ? "page" : undefined}
                     className={`focus-ring flex h-10 items-center gap-2.5 whitespace-nowrap rounded-pill px-3.5 text-sm transition-colors duration-(--duration-fast) lg:rounded-control ${
-                      on ? "bg-primary font-medium text-primary-foreground" : "text-muted hover:bg-surface-2 hover:text-foreground"
+                      on
+                        ? variant === "platform"
+                          ? "bg-platform font-medium text-platform-foreground"
+                          : "bg-primary font-medium text-primary-foreground"
+                        : "text-muted hover:bg-surface-2 hover:text-foreground"
                     }`}
                   >
                     {Icon && <Icon width={17} height={17} aria-hidden />}
