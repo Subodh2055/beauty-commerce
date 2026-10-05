@@ -19,16 +19,21 @@ def test_every_scheduled_task_is_registered() -> None:
         assert entry["task"] in celery_module.celery_app.tasks
 
 
-def test_heartbeat_is_off_by_default() -> None:
-    assert "system-heartbeat" not in celery_module.celery_app.conf.beat_schedule
+def test_heartbeat_is_on_by_default() -> None:
+    # It feeds the super-admin system-health page (beat -> broker -> worker).
+    entry = celery_module.celery_app.conf.beat_schedule["system-heartbeat"]
+    assert entry == {"task": "system.ping", "schedule": 60.0}
 
 
-def test_heartbeat_can_be_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings, "beat_heartbeat_seconds", 30)
+@pytest.mark.parametrize(("seconds", "expected"), [(30, 30.0), (0, None)])
+def test_heartbeat_interval_is_configurable(
+    monkeypatch: pytest.MonkeyPatch, seconds: int, expected: float | None
+) -> None:
+    monkeypatch.setattr(settings, "beat_heartbeat_seconds", seconds)
     try:
         reloaded = importlib.reload(celery_module)
-        entry = reloaded.celery_app.conf.beat_schedule["system-heartbeat"]
-        assert entry == {"task": "system.ping", "schedule": 30.0}
+        entry = reloaded.celery_app.conf.beat_schedule.get("system-heartbeat")
+        assert (entry or {}).get("schedule") == expected
     finally:
         monkeypatch.undo()
         importlib.reload(celery_module)
