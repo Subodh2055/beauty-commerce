@@ -30,7 +30,16 @@ function shortDate(iso: string): string {
  *   days and a live region reads the day's figures; hover does the same.
  * - "Show data as a table" gives the full series as a real table.
  */
-export function SalesChart({ series, currency }: { series: SalesPoint[]; currency: string }) {
+export function SalesChart({
+  series,
+  currency,
+  earningsLabel = "Earnings",
+}: {
+  series: SalesPoint[];
+  currency: string;
+  /** What `earnings` means in this chart's tooltip and table (admin: refunds). */
+  earningsLabel?: string;
+}) {
   const id = useId();
   const [active, setActive] = useState<number | null>(null);
   const data = useMemo(
@@ -186,7 +195,9 @@ export function SalesChart({ series, currency }: { series: SalesPoint[]; currenc
           >
             <p className="font-semibold">{shortDate(a.date)}</p>
             <p className="tabular-nums">Revenue {formatMoney(a.rev, currency)}</p>
-            <p className="tabular-nums text-muted">Earnings {formatMoney(a.earn, currency)}</p>
+            <p className="tabular-nums text-muted">
+              {earningsLabel} {formatMoney(a.earn, currency)}
+            </p>
             <p className="tabular-nums">
               {a.orders} order{a.orders === 1 ? "" : "s"} · {a.units} unit{a.units === 1 ? "" : "s"}
             </p>
@@ -209,7 +220,7 @@ export function SalesChart({ series, currency }: { series: SalesPoint[]; currenc
               <tr className="text-left text-2xs tracking-eyebrow text-muted uppercase">
                 <th scope="col" className="px-3 py-2">Day</th>
                 <th scope="col" className="px-3 py-2 text-right">Revenue</th>
-                <th scope="col" className="px-3 py-2 text-right">Earnings</th>
+                <th scope="col" className="px-3 py-2 text-right">{earningsLabel}</th>
                 <th scope="col" className="px-3 py-2 text-right">Orders</th>
                 <th scope="col" className="px-3 py-2 text-right">Units</th>
               </tr>
