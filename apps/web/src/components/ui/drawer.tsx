@@ -17,6 +17,8 @@ interface DrawerProps {
   children: ReactNode;
   /** Hide below this breakpoint's counterpart, e.g. "lg:hidden" for mobile-only drawers. */
   className?: string;
+  /** Panel width: sm (menus, filters, bag) or lg (detail views). */
+  size?: "sm" | "lg";
 }
 
 export function Drawer({
@@ -28,6 +30,7 @@ export function Drawer({
   footer,
   children,
   className = "",
+  size = "sm",
 }: DrawerProps) {
   const { mounted, closing } = usePresence(open);
   const panel = useRef<HTMLDivElement>(null);
@@ -50,7 +53,7 @@ export function Drawer({
           aria-modal="true"
           aria-labelledby={titleId}
           tabIndex={-1}
-          className={`absolute inset-y-0 ${edge} flex w-[88vw] max-w-sm flex-col bg-background shadow-overlay outline-none ${
+          className={`absolute inset-y-0 ${edge} flex w-[88vw] ${size === "lg" ? "max-w-lg" : "max-w-sm"} flex-col bg-background shadow-overlay outline-none ${
             closing ? `${exit} transition-transform duration-(--duration-exit) ease-exit` : enter
           }`}
         >
