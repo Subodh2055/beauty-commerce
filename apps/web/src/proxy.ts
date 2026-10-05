@@ -1,5 +1,5 @@
 /**
- * Server-side gate for /admin and /vendor.
+ * Server-side gate for /admin, /super-admin and /vendor.
  *
  * Next 16 renamed the `middleware` file convention to `proxy`; this runs before
  * the route is rendered, same as before.
@@ -22,12 +22,18 @@
  * the status page, which explains where their application stands. This is a
  * routing convenience: every /vendor/* API call is separately authorised and
  * scoped to the caller's own store by the API (vendor isolation).
+ *
+ * /admin needs a staff role or any admin permission (custom roles are made in
+ * /super-admin); /super-admin needs the SUPER_ADMIN role. Individual pages and
+ * every API route check their own permission on top.
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 
 const COOKIE_NAME = "bc_at";
 const ADMIN_ROLES = new Set(["STAFF", "ADMIN", "SUPER_ADMIN"]);
+/** Permissions a non-staff account can hold; any other one opens /admin. */
+const NON_ADMIN_CODES = new Set(["vendor.portal", "media.upload"]);
 const VENDOR_ROLE = "VENDOR";
 /** Vendor pages any signed-in user may open (apply, check application status). */
 const VENDOR_OPEN = ["/vendor/apply", "/vendor/status"];
@@ -57,6 +63,7 @@ export async function proxy(req: NextRequest) {
   }
 
   let roles: string[] = [];
+  let permissions: string[] = [];
   try {
     const res = await fetch(`${API}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -67,7 +74,9 @@ export async function proxy(req: NextRequest) {
     // which from here, so use the neutral reason rather than claiming idle.
     if (res.status === 401) return redirect(req, `/login?expired=revoked&next=${next}`);
     if (!res.ok) throw new Error(`auth/me returned ${res.status}`);
-    roles = ((await res.json()) as { roles?: string[] }).roles ?? [];
+    const me = (await res.json()) as { roles?: string[]; permissions?: string[] };
+    roles = me.roles ?? [];
+    permissions = me.permissions ?? [];
   } catch {
     // API unreachable or slow: fail closed rather than serve the admin shell.
     return redirect(req, `/login?next=${next}`);
@@ -79,14 +88,17 @@ export async function proxy(req: NextRequest) {
     return roles.includes(VENDOR_ROLE) ? NextResponse.next() : redirect(req, "/vendor/status");
   }
 
-  if (!roles.some((r) => ADMIN_ROLES.has(r))) {
-    return redirect(req, "/");
+  if (path === "/super-admin" || path.startsWith("/super-admin/")) {
+    if (roles.includes("SUPER_ADMIN")) return NextResponse.next();
+    return redirect(req, roles.some((r) => ADMIN_ROLES.has(r)) ? "/admin" : "/");
   }
-  return NextResponse.next();
+
+  const staff = roles.some((r) => ADMIN_ROLES.has(r)) || permissions.some((p) => !NON_ADMIN_CODES.has(p));
+  return staff ? NextResponse.next() : redirect(req, "/");
 }
 
 export const config = {
   // Admin and vendor pages only — without a matcher this would run on every
   // request, including static assets.
-  matcher: ["/admin/:path*", "/vendor", "/vendor/:path*"],
+  matcher: ["/admin/:path*", "/super-admin/:path*", "/vendor", "/vendor/:path*"],
 };
