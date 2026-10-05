@@ -26,15 +26,21 @@ from app.modules.users.models import User
 from app.modules.vendors import service
 from app.modules.vendors.dependencies import ActiveVendor, CurrentVendor
 from app.modules.vendors.schemas import (
+    BulkProductIn,
+    BulkProductResult,
     CommissionIn,
+    InventoryRow,
     StockOut,
     StockSetIn,
+    VendorAnalytics,
     VendorApplyIn,
     VendorDecisionIn,
     VendorOut,
     VendorProductRow,
+    VendorProductSort,
     VendorPublic,
     VendorReasonIn,
+    VendorReviewList,
     VendorSummary,
     VendorUpdateIn,
 )
@@ -87,11 +93,38 @@ async def portal_summary(db: DbSession, vendor: CurrentVendor) -> VendorSummary:
     return await service.summary(db, vendor)
 
 
+@portal_router.get(
+    "/analytics",
+    response_model=VendorAnalytics,
+    summary="Sales by day, top products and low-stock alerts",
+)
+async def portal_analytics(
+    db: DbSession, vendor: CurrentVendor, days: Annotated[int, Query(ge=7, le=90)] = 30
+) -> VendorAnalytics:
+    return await service.analytics(db, vendor, days)
+
+
 @portal_router.get("/products", response_model=Page[VendorProductRow])
 async def portal_products(
-    db: DbSession, vendor: CurrentVendor, page: Paging, status: str | None = Query(default=None)
+    db: DbSession,
+    vendor: CurrentVendor,
+    page: Paging,
+    status: str | None = Query(default=None),
+    q: str | None = Query(default=None, max_length=100),
+    sort: VendorProductSort = "updated",
 ) -> Page[VendorProductRow]:
-    return await service.list_products(db, vendor, status, page)
+    return await service.list_products(db, vendor, status, page, q=q, sort=sort)
+
+
+@portal_router.post(
+    "/products/bulk",
+    response_model=BulkProductResult,
+    summary="Submit, archive or delete several products (per-product results)",
+)
+async def portal_bulk_products(
+    body: BulkProductIn, db: DbSession, vendor: ActiveVendor
+) -> BulkProductResult:
+    return await service.bulk_products(db, vendor, body)
 
 
 @portal_router.post(
@@ -149,6 +182,27 @@ async def portal_set_stock(
     user: CurrentUser,
 ) -> StockOut:
     return await service.set_stock(db, vendor, variant_id, body, user.id)
+
+
+@portal_router.get("/inventory", response_model=Page[InventoryRow], summary="Stock per variant")
+async def portal_inventory(
+    db: DbSession,
+    vendor: CurrentVendor,
+    page: Paging,
+    q: str | None = Query(default=None, max_length=100),
+    low_only: bool = False,
+) -> Page[InventoryRow]:
+    return await service.inventory(db, vendor, q, low_only, page)
+
+
+@portal_router.get("/reviews", response_model=VendorReviewList, summary="Reviews of my products")
+async def portal_reviews(
+    db: DbSession,
+    vendor: CurrentVendor,
+    page: Paging,
+    rating: Annotated[int | None, Query(ge=1, le=5)] = None,
+) -> VendorReviewList:
+    return await service.reviews(db, vendor, rating, page)
 
 
 @portal_router.get("/orders", response_model=Page[VendorOrderOut])
