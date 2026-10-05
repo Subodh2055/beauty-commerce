@@ -1,11 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth, useOrders, type OrderSummary } from "@/lib/auth";
 import { formatMoney } from "@/lib/format";
-import { PageHeader } from "@/components/catalog/page-header";
+import { AccountShell } from "@/components/account/account-shell";
 import { ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderStatusBadge, PaymentStatusBadge } from "@/components/order/status-badge";
@@ -14,18 +13,21 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { BagIcon } from "@/components/ui/icons";
 
 export default function OrdersPage() {
+  return (
+    <AccountShell title="Your orders" crumbs={[{ href: "/account", label: "Account" }, { href: "/orders", label: "Orders" }]}>
+      <OrderList />
+    </AccountShell>
+  );
+}
+
+function OrderList() {
   const { user, ready } = useAuth();
   const { list } = useOrders();
-  const router = useRouter();
   const [orders, setOrders] = useState<OrderSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!ready) return;
-    if (!user) {
-      router.replace("/login?next=/orders");
-      return;
-    }
+    if (!ready || !user) return;
     let active = true;
     (async () => {
       try {
@@ -43,12 +45,10 @@ export default function OrdersPage() {
     };
     // list() is stable per render; refetch only when auth state changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, user, router]);
+  }, [ready, user]);
 
   return (
-    <div className="container-x py-10">
-      <PageHeader title="Your orders" crumbs={[{ href: "/orders", label: "Orders" }]} />
-
+    <>
       {orders === null ? (
         <div className="space-y-3">
           <Skeleton className="h-24" />
@@ -91,6 +91,6 @@ export default function OrdersPage() {
           ))}
         </ul>
       )}
-    </div>
+    </>
   );
 }
