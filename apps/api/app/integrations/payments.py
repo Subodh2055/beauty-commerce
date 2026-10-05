@@ -127,6 +127,12 @@ def provider_for(method: PaymentMethod) -> PaymentProvider:
     return _NotConfigured(method)
 
 
+def is_available(method: PaymentMethod) -> bool:
+    """Whether checkout can take this method right now (COD always; online
+    methods once a provider is configured — the stub stands in during dev)."""
+    return not isinstance(provider_for(method), _NotConfigured)
+
+
 def provider_by_name(name: str) -> PaymentProvider | None:
     """Resolve the provider named in a callback URL."""
     if name == StubGateway.name and settings.payment_stub_enabled:
