@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
+from app.core import metrics
 from app.core.config import settings
 from app.core.logging import get_logger
 
@@ -28,6 +29,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         start = time.perf_counter()
         response = await call_next(request)
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
+        metrics.observe(request.method, request.url.path, response.status_code, duration_ms)
 
         response.headers[REQUEST_ID_HEADER] = request_id
         log.info(
