@@ -1,4 +1,7 @@
+"""/super-admin/audit-logs — read the audit trail (super admin only)."""
+
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -11,25 +14,37 @@ from app.modules.auth.dependencies import require_permission
 from app.shared.enums import Permission
 from app.shared.pagination import Page, PageParams, page_params
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_permission(Permission.AUDIT_VIEW))])
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 Paging = Annotated[PageParams, Depends(page_params)]
 
 
-@router.get(
-    "",
-    response_model=Page[AuditLogOut],
-    dependencies=[Depends(require_permission(Permission.AUDIT_READ))],
-    summary="Audit log (newest first)",
-)
+@router.get("", response_model=Page[AuditLogOut], summary="Audit log (newest first)")
 async def list_audit_logs(
     db: DbSession,
     page: Paging,
     actor_id: Annotated[uuid.UUID | None, Query()] = None,
     entity_type: str | None = Query(default=None, max_length=60),
     entity_id: str | None = Query(default=None, max_length=128),
+    action: str | None = Query(default=None, max_length=80),
+    q: str | None = Query(default=None, max_length=200, description="Actor email, id or path"),
+    since: Annotated[datetime | None, Query()] = None,
+    until: Annotated[datetime | None, Query()] = None,
 ) -> Page[AuditLogOut]:
     return await service.list_logs(
-        db, page, actor_id=actor_id, entity_type=entity_type, entity_id=entity_id
+        db,
+        page,
+        actor_id=actor_id,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        action=action,
+        q=q,
+        since=since,
+        until=until,
     )
+
+
+@router.get("/entity-types", response_model=list[str], summary="Entity types seen in the log")
+async def entity_types(db: DbSession) -> list[str]:
+    return await service.entity_types(db)
