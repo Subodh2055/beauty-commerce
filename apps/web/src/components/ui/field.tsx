@@ -9,6 +9,7 @@ import {
   useId,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
@@ -86,8 +87,9 @@ function Shell({
   );
 }
 
+// `ref` is a plain prop in React 19; spreading it reaches the control (react-hook-form's register).
 type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "className"> &
-  ShellProps & { inputClassName?: string };
+  ShellProps & { inputClassName?: string; ref?: Ref<HTMLInputElement> };
 
 export function Input({
   label,
@@ -119,7 +121,7 @@ export function Field(props: InputProps & { label: string }) {
 }
 
 type TextareaProps = Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "className"> &
-  ShellProps & { inputClassName?: string };
+  ShellProps & { inputClassName?: string; ref?: Ref<HTMLTextAreaElement> };
 
 export function Textarea({
   label,
@@ -160,6 +162,7 @@ type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "className" | "
     placeholder?: string;
     controlSize?: "sm" | "md";
     selectClassName?: string;
+    ref?: Ref<HTMLSelectElement>;
   };
 
 /** Native <select> (keyboard + mobile pickers for free), styled to match. */
