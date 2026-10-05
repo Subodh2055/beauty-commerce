@@ -75,7 +75,8 @@ class VendorOrderStatus(StrEnum):
     """Fulfilment state of one vendor's share of an order."""
 
     PENDING = "PENDING"  # parent order awaiting payment
-    PROCESSING = "PROCESSING"
+    PROCESSING = "PROCESSING"  # paid / COD accepted: new, to be packed
+    PACKED = "PACKED"  # packed and waiting for the courier
     SHIPPED = "SHIPPED"
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
@@ -105,6 +106,11 @@ class MediaStatus(StrEnum):
     PENDING = "PENDING"
     READY = "READY"
     FAILED = "FAILED"
+
+
+class SubscriptionStatus(StrEnum):
+    SUBSCRIBED = "SUBSCRIBED"
+    UNSUBSCRIBED = "UNSUBSCRIBED"
 
 
 class PaymentMethod(StrEnum):
