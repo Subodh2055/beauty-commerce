@@ -145,6 +145,9 @@ class OrderItem(UUIDMixin, Base):
     unit_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     quantity: Mapped[int] = mapped_column(Integer, nullable=False)
     line_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    # Snapshot of the commission on this line (None for platform-sold lines).
+    commission_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    commission_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
 
     order: Mapped[Order] = relationship(back_populates="items")
     vendor_order: Mapped[VendorOrder | None] = relationship(back_populates="items")

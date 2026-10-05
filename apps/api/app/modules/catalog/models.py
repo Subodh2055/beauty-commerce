@@ -38,6 +38,12 @@ EMBEDDING_DIM = 1024
 
 class Category(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "categories"
+    __table_args__ = (
+        CheckConstraint(
+            "commission_rate IS NULL OR (commission_rate >= 0 AND commission_rate <= 100)",
+            name="ck_categories_commission_rate",
+        ),
+    )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     slug: Mapped[str] = mapped_column(String(140), unique=True, index=True, nullable=False)
@@ -48,6 +54,9 @@ class Category(UUIDMixin, TimestampMixin, Base):
     )
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Commission override for products in this category (and its subcategories
+    # without their own); a vendor's own rate still wins. None = inherit.
+    commission_rate: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
 
     parent: Mapped["Category | None"] = relationship(
         remote_side="Category.id", back_populates="children"
