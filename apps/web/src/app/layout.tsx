@@ -10,6 +10,7 @@ import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SessionTimeout } from "@/components/auth/session-timeout";
 import { Toaster } from "@/lib/toast";
 import { ConfirmHost } from "@/components/ui/confirm";
+import { PromptHost } from "@/components/ui/prompt";
 import { getCategoryTree, type CategoryTree } from "@/lib/api";
 import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -71,6 +72,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <CartDrawer />
             <Toaster />
             <ConfirmHost />
+            <PromptHost />
           </StoreProvider>
         </AuthProvider>
       </body>
