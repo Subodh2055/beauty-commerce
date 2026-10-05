@@ -1,6 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
@@ -85,6 +86,9 @@ class VendorProductRow(BaseModel):
     base_price: Decimal
     currency: str
     total_stock: int
+    variant_count: int = 0
+    product_type: str | None = None
+    image_url: str | None = None
     updated_at: datetime
 
 
@@ -104,3 +108,119 @@ class VendorSummary(BaseModel):
     products_by_status: dict[str, int]
     orders_to_ship: int
     earnings: EarningsSummary
+
+
+VendorProductSort = Literal[
+    "updated",
+    "updated_asc",
+    "name",
+    "name_desc",
+    "price_asc",
+    "price_desc",
+    "stock_asc",
+    "stock_desc",
+]
+
+
+class BulkProductIn(BaseModel):
+    product_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+    action: Literal["submit", "archive", "delete"]
+
+
+class BulkFailure(BaseModel):
+    id: uuid.UUID
+    reason: str
+
+
+class BulkProductResult(BaseModel):
+    """Per-product outcome: one bad row never blocks the rest."""
+
+    done: list[uuid.UUID]
+    failed: list[BulkFailure]
+
+
+# --- Reports ----------------------------------------------------------------------
+
+
+class SalesPoint(BaseModel):
+    date: date
+    revenue: Decimal  # gross: what customers paid for this vendor's lines
+    earnings: Decimal  # after commission
+    orders: int
+    units: int
+
+
+class SalesTotals(BaseModel):
+    revenue: Decimal
+    earnings: Decimal
+    orders: int
+    units: int
+    avg_order_value: Decimal
+
+
+class TopProduct(BaseModel):
+    product_id: uuid.UUID
+    name: str
+    slug: str | None = None
+    image_url: str | None = None
+    units: int
+    revenue: Decimal
+
+
+class LowStockItem(BaseModel):
+    variant_id: uuid.UUID
+    product_id: uuid.UUID
+    product_name: str
+    variant_name: str
+    sku: str
+    stock_quantity: int
+
+
+class VendorAnalytics(BaseModel):
+    days: int
+    currency: str
+    series: list[SalesPoint]  # one point per day, zero-filled, oldest first
+    totals: SalesTotals
+    previous: SalesTotals  # the same-length period just before, for deltas
+    top_products: list[TopProduct]
+    low_stock: list[LowStockItem]
+    low_stock_threshold: int
+
+
+class InventoryRow(BaseModel):
+    variant_id: uuid.UUID
+    product_id: uuid.UUID
+    product_name: str
+    product_status: str
+    variant_name: str
+    sku: str
+    size_ml: Decimal | None = None
+    price: Decimal
+    stock_quantity: int
+    low: bool
+
+
+class ReviewedProductRef(BaseModel):
+    name: str
+    slug: str
+
+
+class VendorReviewRow(BaseModel):
+    id: uuid.UUID
+    rating: int
+    title: str | None = None
+    body: str | None = None
+    author: str  # "Asha S." — first name + initial only
+    is_verified_purchase: bool
+    created_at: datetime
+    product: ReviewedProductRef
+
+
+class VendorReviewList(BaseModel):
+    items: list[VendorReviewRow]
+    total: int
+    page: int
+    size: int
+    average: Decimal
+    count: int
+    stars: dict[str, int]  # "1".."5"
