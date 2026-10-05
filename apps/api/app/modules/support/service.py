@@ -15,9 +15,11 @@ from app.core.exceptions import NotFoundError, ValidationFailedError
 from app.modules.support import repository as repo
 from app.modules.support.models import SupportTicket, TicketMessage
 from app.modules.support.schemas import (
+    Assignee,
     MessageOut,
     StaffMessageIn,
     StaffTicketDetail,
+    StaffTicketSummary,
     TicketCreateIn,
     TicketDetail,
     TicketSummary,
@@ -39,12 +41,18 @@ def _public_detail(t: SupportTicket) -> TicketDetail:
     )
 
 
-def _staff_detail(t: SupportTicket) -> StaffTicketDetail:
+async def _staff_detail(db: AsyncSession, t: SupportTicket) -> StaffTicketDetail:
+    users = await repo.users_by_id(db, {u for u in (t.requester_id, t.assigned_to) if u})
+    requester, assignee = users.get(t.requester_id), users.get(t.assigned_to)
     return StaffTicketDetail(
         **TicketSummary.model_validate(t).model_dump(),
         messages=[MessageOut.model_validate(m) for m in t.messages],
         requester_id=t.requester_id,
+        requester_email=requester.email if requester else None,
+        requester_name=requester.full_name if requester else None,
         assigned_to=t.assigned_to,
+        assignee_email=assignee.email if assignee else None,
+        order_number=await repo.order_number(db, t.order_id),
     )
 
 
@@ -126,12 +134,52 @@ async def close_mine(db: AsyncSession, user_id: uuid.UUID, ticket_id: uuid.UUID)
 
 
 async def list_all(
-    db: AsyncSession, page: PageParams, *, status: str | None, assigned_to: uuid.UUID | None
-) -> Page[TicketSummary]:
+    db: AsyncSession,
+    page: PageParams,
+    *,
+    status: str | None,
+    assigned_to: uuid.UUID | None,
+    priority: str | None = None,
+    q: str | None = None,
+) -> Page[StaffTicketSummary]:
     rows, total = await repo.list_all(
-        db, status=status, assigned_to=assigned_to, offset=page.offset, limit=page.size
+        db,
+        status=status,
+        assigned_to=assigned_to,
+        priority=priority,
+        q=q,
+        offset=page.offset,
+        limit=page.size,
     )
-    return _page(rows, total, page)
+    users = await repo.users_by_id(
+        db, {u for t in rows for u in (t.requester_id, t.assigned_to) if u}
+    )
+    items = []
+    for t in rows:
+        visible = [m for m in t.messages if not m.is_internal]
+        last = visible[-1] if visible else None
+        requester, assignee = users.get(t.requester_id), users.get(t.assigned_to)
+        open_ = t.status not in (TicketStatus.RESOLVED, TicketStatus.CLOSED)
+        items.append(
+            StaffTicketSummary(
+                **TicketSummary.model_validate(t).model_dump(),
+                requester_id=t.requester_id,
+                requester_email=requester.email if requester else None,
+                requester_name=requester.full_name if requester else None,
+                assigned_to=t.assigned_to,
+                assignee_email=assignee.email if assignee else None,
+                message_count=len(t.messages),
+                last_message_at=t.messages[-1].created_at if t.messages else None,
+                needs_reply=bool(last and not last.from_staff) and open_,
+            )
+        )
+    return Page(items=items, total=total, page=page.page, size=page.size)
+
+
+async def assignees(db: AsyncSession) -> list[Assignee]:
+    return [
+        Assignee(id=u.id, email=u.email, full_name=u.full_name) for u in await repo.assignees(db)
+    ]
 
 
 async def _get(db: AsyncSession, ticket_id: uuid.UUID) -> SupportTicket:
@@ -142,7 +190,7 @@ async def _get(db: AsyncSession, ticket_id: uuid.UUID) -> SupportTicket:
 
 
 async def get_staff(db: AsyncSession, ticket_id: uuid.UUID) -> StaffTicketDetail:
-    return _staff_detail(await _get(db, ticket_id))
+    return await _staff_detail(db, await _get(db, ticket_id))
 
 
 async def reply_staff(
@@ -167,7 +215,7 @@ async def reply_staff(
     _touch(ticket)
     await db.commit()
     await db.refresh(ticket)
-    return _staff_detail(ticket)
+    return await _staff_detail(db, ticket)
 
 
 async def update_staff(
@@ -177,12 +225,12 @@ async def update_staff(
     changes = body.model_dump(exclude_unset=True)
     if "assigned_to" in changes and changes["assigned_to"] is not None:
         assignee = await db.get(User, changes["assigned_to"])
-        if assignee is None:
-            raise ValidationFailedError("Assignee not found")
+        if assignee is None or not assignee.has_permission("support.edit"):
+            raise ValidationFailedError("Assign tickets to someone who can answer them")
     for field, value in changes.items():
         setattr(ticket, field, value)
     if changes.get("status") == TicketStatus.CLOSED:
         ticket.closed_at = _now()
     await db.commit()
     await db.refresh(ticket)
-    return _staff_detail(ticket)
+    return await _staff_detail(db, ticket)
