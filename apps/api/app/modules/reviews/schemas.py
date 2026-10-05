@@ -38,3 +38,37 @@ class ReviewList(BaseModel):
     breakdown: RatingBreakdown
     # The requesting user's own review, if any (so the UI can prefill/edit).
     my_review: ReviewOut | None = None
+
+
+class ReviewedProduct(BaseModel):
+    name: str
+    slug: str
+
+
+class FeaturedReview(BaseModel):
+    """A real customer review chosen for the storefront (testimonials)."""
+
+    id: uuid.UUID
+    rating: int
+    title: str | None = None
+    body: str
+    author: str  # "Asha S." — first name + initial only
+    is_verified_purchase: bool
+    product: ReviewedProduct
+
+
+class MyReviewProduct(ReviewedProduct):
+    image_url: str | None = None
+
+
+class MyReview(BaseModel):
+    """One of the signed-in user's reviews, for their account page."""
+
+    id: uuid.UUID
+    rating: int
+    title: str | None = None
+    body: str | None = None
+    is_verified_purchase: bool
+    created_at: datetime
+    updated_at: datetime
+    product: MyReviewProduct
