@@ -4,10 +4,10 @@ from decimal import Decimal
 from sqlalchemy import exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.catalog.models import Product
+from app.modules.catalog.models import Product, ProductImage
 from app.modules.orders.models import Order, OrderItem
 from app.modules.reviews.models import Review
-from app.shared.enums import OrderStatus
+from app.shared.enums import OrderStatus, ProductStatus
 
 
 async def get_product_by_slug(db: AsyncSession, slug: str) -> Product | None:
@@ -76,3 +76,41 @@ async def recompute_product_rating(db: AsyncSession, product: Product) -> None:
     ).one()
     product.rating_avg = Decimal(row[0]).quantize(Decimal("0.01"))
     product.rating_count = int(row[1])
+
+
+async def featured(db: AsyncSession, limit: int, min_rating: int, min_length: int):
+    """Recent, substantive 4-5 star reviews of products that are live."""
+    stmt = (
+        select(Review, Product.name, Product.slug)
+        .join(Product, Product.id == Review.product_id)
+        .where(
+            Review.rating >= min_rating,
+            Review.body.isnot(None),
+            func.length(Review.body) >= min_length,
+            Product.status == ProductStatus.PUBLISHED,
+        )
+        .order_by(
+            Review.is_verified_purchase.desc(), Review.rating.desc(), Review.created_at.desc()
+        )
+        .limit(limit)
+    )
+    return list((await db.execute(stmt)).all())
+
+
+async def list_user_reviews(db: AsyncSession, user_id: uuid.UUID):
+    """The user's reviews, newest edit first, with each product's cover image."""
+    cover = (
+        select(ProductImage.url)
+        .where(ProductImage.product_id == Product.id)
+        .order_by(ProductImage.is_primary.desc(), ProductImage.sort_order)
+        .limit(1)
+        .correlate(Product)
+        .scalar_subquery()
+    )
+    stmt = (
+        select(Review, Product.name, Product.slug, cover)
+        .join(Product, Product.id == Review.product_id)
+        .where(Review.user_id == user_id)
+        .order_by(Review.updated_at.desc())
+    )
+    return list((await db.execute(stmt)).all())
