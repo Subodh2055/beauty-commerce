@@ -6,6 +6,7 @@ import { StoreProvider } from "@/lib/store";
 import { AuthProvider } from "@/lib/auth";
 import { WishlistSync } from "@/components/wishlist-sync";
 import { CartSync } from "@/components/cart-sync";
+import { CartDrawer } from "@/components/cart/cart-drawer";
 import { SessionTimeout } from "@/components/auth/session-timeout";
 import { Toaster } from "@/lib/toast";
 import { ConfirmHost } from "@/components/ui/confirm";
@@ -13,17 +14,21 @@ import { getCategoryTree, type CategoryTree } from "@/lib/api";
 import { THEME_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
-// Display: Cormorant Garamond (static family, so weights are listed). Body/UI: Inter.
+// Display: Cormorant Garamond (static family, so weights are listed). Every serif
+// heading uses 600, so only 600 (+ italic) ships: 2 font files instead of 6.
+// Body/UI: Inter.
 const display = Cormorant_Garamond({
   variable: "--font-cormorant",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["600"],
   style: ["normal", "italic"],
   display: "swap",
 });
 const sans = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
+  // Absolute URLs for canonical links and OG/Twitter images.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: { default: "Beauty Commerce", template: "%s · Beauty Commerce" },
   description:
     "Perfumes, cosmetics and skincare — curated with AI-assisted shopping.",
@@ -63,6 +68,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             <Header categories={categories} />
             <main className="flex-1">{children}</main>
             <Footer categories={categories} />
+            <CartDrawer />
             <Toaster />
             <ConfirmHost />
           </StoreProvider>
