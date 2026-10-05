@@ -91,7 +91,9 @@ async def get_vendor_order(
     stmt = (
         select(VendorOrder)
         .where(VendorOrder.id == vendor_order_id, VendorOrder.vendor_id == vendor_id)
-        .options(selectinload(VendorOrder.order))
+        # Status changes read the sibling sub-orders (sync_parent_status); load them
+        # here — a lazy load inside async code raises MissingGreenlet.
+        .options(selectinload(VendorOrder.order).selectinload(Order.vendor_orders))
     )
     if for_update:
         stmt = stmt.with_for_update(of=VendorOrder)
