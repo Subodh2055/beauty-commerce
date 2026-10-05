@@ -11,6 +11,8 @@ import { DataTable, type Column } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/field";
 import { confirmDialog } from "@/components/ui/confirm";
+import { RequirePermission } from "@/components/admin/ui";
+import { useCan } from "@/lib/permissions";
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   PUBLISHED: "success",
@@ -20,7 +22,8 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   ARCHIVED: "gold",
 };
 
-export default function AdminProducts() {
+function AdminProductsPage() {
+  const { can } = useCan();
   const admin = useAdmin();
   const [rows, setRows] = useState<AdminProductRow[] | null>(null);
   const [query, setQuery] = useState("");
@@ -121,6 +124,8 @@ export default function AdminProducts() {
       header: "Actions",
       cell: (p) => (
         <div className="flex flex-wrap gap-1">
+          {can("products.edit") && (
+            <>
           <ButtonLink href={`/admin/products/${p.id}`} variant="outline" size="sm" className="h-8! px-3! text-xs">
             Edit
           </ButtonLink>
@@ -142,6 +147,9 @@ export default function AdminProducts() {
               Publish
             </Button>
           )}
+            </>
+          )}
+          {can("products.delete") && (
           <Button
             size="sm"
             variant="ghost"
@@ -151,6 +159,7 @@ export default function AdminProducts() {
           >
             Delete
           </Button>
+          )}
         </div>
       ),
     },
@@ -169,9 +178,11 @@ export default function AdminProducts() {
           className="w-full max-w-xs"
           inputClassName="h-10 rounded-pill px-4"
         />
+        {can("products.create") && (
         <ButtonLink href="/admin/products/new" size="sm" className="h-10!">
           + New product
         </ButtonLink>
+        )}
       </div>
       <DataTable
         caption="Products"
@@ -188,5 +199,13 @@ export default function AdminProducts() {
         }
       />
     </div>
+  );
+}
+
+export default function AdminProducts() {
+  return (
+    <RequirePermission code="products.view">
+      <AdminProductsPage />
+    </RequirePermission>
   );
 }

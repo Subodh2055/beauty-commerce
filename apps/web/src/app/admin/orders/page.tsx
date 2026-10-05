@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { FilterChips } from "@/components/ui/filter-chips";
 import { OrderStatusBadge, PaymentStatusBadge, label } from "@/components/order/status-badge";
 import { Button } from "@/components/ui/button";
+import { RequirePermission } from "@/components/admin/ui";
+import { useCan } from "@/lib/permissions";
 
 const STATUSES = ["", "PENDING_PAYMENT", "PROCESSING", "SHIPPED", "DELIVERED", "CANCELLED", "REFUNDED"];
 
@@ -21,7 +23,8 @@ const NEXT: Record<string, string[]> = {
   DELIVERED: ["REFUNDED"],
 };
 
-export default function AdminOrders() {
+function AdminOrdersPage() {
+  const { can } = useCan();
   const admin = useAdmin();
   const [rows, setRows] = useState<AdminOrderRow[] | null>(null);
   const [filter, setFilter] = useState("");
@@ -118,7 +121,8 @@ export default function AdminOrders() {
     {
       key: "actions",
       header: "Actions",
-      cell: (o) => (
+      cell: (o) =>
+        !can("orders.edit") ? null : (
         <div className="flex flex-wrap gap-1">
           {o.payment_status === "PENDING" &&
             !["CANCELLED", "REFUNDED", "PAYMENT_FAILED"].includes(o.status) && (
@@ -166,5 +170,13 @@ export default function AdminOrders() {
         }
       />
     </div>
+  );
+}
+
+export default function AdminOrders() {
+  return (
+    <RequirePermission code="orders.view">
+      <AdminOrdersPage />
+    </RequirePermission>
   );
 }

@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { useAdmin, type AdminProductDetail } from "@/lib/auth";
 import { ProductForm } from "@/components/admin/product-form";
 import { Skeleton } from "@/components/ui/skeleton";
+import { RequirePermission } from "@/components/admin/ui";
 
-export default function EditProductPage() {
+function EditProductPagePage() {
   const admin = useAdmin();
   const { id } = useParams<{ id: string }>();
   const [product, setProduct] = useState<AdminProductDetail | null>(null);
@@ -36,5 +37,13 @@ export default function EditProductPage() {
       <h2 className="font-serif text-xl font-semibold">Edit: {product.name}</h2>
       <ProductForm existing={product} />
     </div>
+  );
+}
+
+export default function EditProductPage() {
+  return (
+    <RequirePermission code="products.edit">
+      <EditProductPagePage />
+    </RequirePermission>
   );
 }

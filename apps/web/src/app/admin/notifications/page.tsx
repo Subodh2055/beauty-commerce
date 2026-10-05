@@ -5,6 +5,7 @@ import { useAdmin, type AdminNotification } from "@/lib/auth";
 import { DataTable, type Column } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { RequirePermission } from "@/components/admin/ui";
 
 const CHANNEL_NOTE: Record<string, string> = {
   N8N: "Sent to n8n",
@@ -18,7 +19,7 @@ const STATUS_TONE: Record<string, "success" | "danger" | "gold"> = {
   PENDING: "gold",
 };
 
-export default function AdminNotifications() {
+function AdminNotificationsPage() {
   const admin = useAdmin();
   const [rows, setRows] = useState<AdminNotification[] | null>(null);
 
@@ -99,5 +100,13 @@ export default function AdminNotifications() {
         empty={<EmptyState compact title="No notifications yet" description="Order emails and n8n events will be listed here." />}
       />
     </div>
+  );
+}
+
+export default function AdminNotifications() {
+  return (
+    <RequirePermission code="dashboard.view">
+      <AdminNotificationsPage />
+    </RequirePermission>
   );
 }
