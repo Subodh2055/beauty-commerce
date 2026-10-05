@@ -15,7 +15,7 @@ from app.modules.auth.schemas import (
     UserOut,
     VerifyEmailIn,
 )
-from app.modules.auth.service import _to_user_out
+from app.modules.auth.service import to_user_out
 
 router = APIRouter()
 
@@ -43,7 +43,7 @@ async def logout(body: RefreshIn, db: DbSession) -> MessageOut:
 
 @router.get("/me", response_model=UserOut)
 async def me(user: CurrentUser) -> UserOut:
-    return _to_user_out(user)
+    return to_user_out(user)
 
 
 @router.post("/verify-email", response_model=MessageOut)
