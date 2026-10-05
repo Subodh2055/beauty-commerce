@@ -31,6 +31,7 @@ from app.modules.notifications import service as notifications_service
 from app.modules.orders import service as orders_service
 from app.modules.orders.models import Order, OrderStatusHistory
 from app.modules.orders.schemas import OrderDetail
+from app.modules.returns import service as returns_service
 from app.modules.users.models import User
 from app.shared.enums import OrderStatus, PaymentStatus, ProductStatus
 from app.shared.pagination import Page, PageParams
@@ -194,6 +195,8 @@ async def update_order_status(
         order.payment_status = (
             PaymentStatus.REFUNDED if new_status == OrderStatus.REFUNDED else PaymentStatus.FAILED
         )
+        if new_status == OrderStatus.REFUNDED:
+            await returns_service.refund_remaining_on_status_change(db, order, admin_id)
     elif new_status == OrderStatus.PAID:
         order.payment_status = PaymentStatus.PAID
 
@@ -247,7 +250,12 @@ def _set_status(product: Product, status: str) -> None:
 
 
 async def list_products(
-    db: AsyncSession, page: PageParams, status: str | None, q: str | None
+    db: AsyncSession,
+    page: PageParams,
+    status: str | None,
+    q: str | None,
+    *,
+    oldest_first: bool = False,
 ) -> Page[AdminProductRow]:
     base = select(Product)
     if status:
@@ -255,14 +263,10 @@ async def list_products(
     if q:
         base = base.where(Product.name.ilike(f"%{q}%"))
     total = await db.scalar(select(func.count()).select_from(base.subquery())) or 0
+    # The moderation queue is first-come, first-served; everything else newest first.
+    order = Product.updated_at.asc() if oldest_first else Product.created_at.desc()
     rows = (
-        (
-            await db.scalars(
-                base.order_by(Product.created_at.desc()).offset(page.offset).limit(page.size)
-            )
-        )
-        .unique()
-        .all()
+        (await db.scalars(base.order_by(order).offset(page.offset).limit(page.size))).unique().all()
     )
 
     items = [_row(p) for p in rows]
@@ -502,6 +506,35 @@ async def create_coupon(db: AsyncSession, body: CouponCreateIn) -> CouponOut:
     await db.commit()
     await db.refresh(coupon)
     return CouponOut.model_validate(coupon)
+
+
+async def update_coupon(db: AsyncSession, coupon_id: uuid.UUID, body: CouponCreateIn) -> CouponOut:
+    coupon = await db.get(Coupon, coupon_id)
+    if coupon is None:
+        raise NotFoundError("Coupon not found")
+    code = body.code.strip().upper()
+    if code != coupon.code and await db.scalar(select(Coupon).where(Coupon.code == code)):
+        raise ConflictError("A coupon with this code already exists")
+    if body.usage_limit is not None and body.usage_limit < coupon.used_count:
+        raise ValidationFailedError(f"This coupon has already been used {coupon.used_count} times")
+    for field, value in body.model_dump(exclude={"code"}).items():
+        setattr(coupon, field, value)
+    coupon.code = code
+    await db.commit()
+    await db.refresh(coupon)
+    return CouponOut.model_validate(coupon)
+
+
+async def delete_coupon(db: AsyncSession, coupon_id: uuid.UUID) -> None:
+    """Only a never-redeemed coupon can be deleted; a used one keeps its
+    redemption history, so deactivate it instead."""
+    coupon = await db.get(Coupon, coupon_id)
+    if coupon is None:
+        raise NotFoundError("Coupon not found")
+    if coupon.used_count > 0:
+        raise ConflictError("This coupon has been used. Deactivate it instead of deleting it.")
+    await db.delete(coupon)
+    await db.commit()
 
 
 async def adjust_inventory(
