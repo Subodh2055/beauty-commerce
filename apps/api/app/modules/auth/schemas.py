@@ -31,6 +31,7 @@ class UserOut(BaseModel):
     id: uuid.UUID
     email: str
     full_name: str | None = None
+    phone: str | None = None
     is_email_verified: bool
     roles: list[str]
 
