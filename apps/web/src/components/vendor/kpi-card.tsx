@@ -46,6 +46,7 @@ export function KpiCard({
   format,
   hint,
   icon,
+  lowerIsBetter = false,
 }: {
   label: string;
   value: number;
@@ -54,18 +55,21 @@ export function KpiCard({
   format: (n: number) => string;
   hint?: ReactNode;
   icon?: ReactNode;
+  /** For costs like refunds: a rise is shown as bad (danger), a fall as good. */
+  lowerIsBetter?: boolean;
 }) {
   let delta: ReactNode = null;
   if (previous !== undefined) {
     if (previous === 0 && value === 0) {
       delta = <span className="text-muted">No change</span>;
     } else if (previous === 0) {
-      delta = <span className="text-success">New this period</span>;
+      delta = <span className={lowerIsBetter ? "text-danger" : "text-success"}>New this period</span>;
     } else {
       const pct = ((value - previous) / previous) * 100;
       const up = pct >= 0;
+      const good = up !== lowerIsBetter;
       delta = (
-        <span className={`inline-flex items-center gap-1 ${up ? "text-success" : "text-danger"}`}>
+        <span className={`inline-flex items-center gap-1 ${good ? "text-success" : "text-danger"}`}>
           {up ? <ArrowUpIcon width={13} height={13} /> : <ArrowDownIcon width={13} height={13} />}
           {up ? "Up" : "Down"} {Math.abs(pct).toFixed(pct > -10 && pct < 10 ? 1 : 0)}%
           <span className="text-muted">vs previous</span>
