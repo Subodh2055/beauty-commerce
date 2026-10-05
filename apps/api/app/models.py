@@ -4,6 +4,7 @@ Add `from app.modules.<name>.models import ...` when you add a module.
 """
 
 from app.core.database import Base
+from app.modules.analytics.models import AnalyticsDaily
 from app.modules.audit.models import AuditLog
 from app.modules.auth.models import RefreshToken
 from app.modules.cart.models import CartItem
@@ -27,6 +28,7 @@ from app.modules.notifications.models import Notification
 from app.modules.orders.models import Order, OrderItem, OrderStatusHistory, Payment, VendorOrder
 from app.modules.payments.models import PaymentEvent
 from app.modules.payouts.models import Payout
+from app.modules.returns.models import Refund, ReturnRequest
 from app.modules.reviews.models import Review
 from app.modules.settings.models import PlatformSetting
 from app.modules.support.models import SupportTicket, TicketMessage
@@ -72,4 +74,7 @@ __all__ = [
     "Notification",
     "WishlistItem",
     "CartItem",
+    "AnalyticsDaily",
+    "ReturnRequest",
+    "Refund",
 ]
