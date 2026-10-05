@@ -8,8 +8,10 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
  * outline   — hairline: tertiary actions, toolbars
  * ghost     — text-only: icon buttons, inline actions
  * danger    — destructive
+ * platform  — violet: super-admin-only actions (pair with ShieldIcon); never
+ *             used for everyday admin work, so platform-wide changes stand out
  */
-type Variant = "primary" | "accent" | "secondary" | "outline" | "ghost" | "danger";
+type Variant = "primary" | "accent" | "secondary" | "outline" | "ghost" | "danger" | "platform";
 type Size = "sm" | "md" | "lg" | "icon";
 
 const base =
@@ -25,6 +27,7 @@ const variants: Record<Variant, string> = {
   outline: "border border-border-strong bg-transparent text-foreground hover:border-foreground hover:bg-surface-2",
   ghost: "bg-transparent text-foreground hover:bg-surface-2 hover:translate-y-0",
   danger: "bg-danger text-danger-foreground shadow-soft hover:opacity-90",
+  platform: "bg-platform text-platform-foreground shadow-soft hover:opacity-90 hover:shadow-lift",
 };
 
 // sm stays ≥36px tall for dense admin toolbars; md/lg/icon meet the 44px target.
