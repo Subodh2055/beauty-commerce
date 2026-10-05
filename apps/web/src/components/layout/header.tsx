@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { useMotionValueEvent, useScroll } from "motion/react";
 import { useStore } from "@/lib/store";
+import { openCart } from "@/lib/cart-ui";
 import { isAdmin as checkAdmin, useAuth } from "@/lib/auth";
 import type { CategoryTree } from "@/lib/api";
 import {
@@ -28,6 +30,12 @@ export function Header({ categories }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const [scrolled, setScrolled] = useState(false);
+  const { scrollY } = useScroll();
+  useMotionValueEvent(scrollY, "change", (y) => setScrolled(y > 24));
+  // The home hero runs full-bleed under a transparent bar until you scroll.
+  const isHome = pathname === "/";
+  const glass = scrolled || !isHome;
 
   const isAdmin = checkAdmin(user);
 
@@ -42,8 +50,26 @@ export function Header({ categories }: Props) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container-x flex h-16 items-center gap-3 sm:gap-4">
+      {/*
+        Shrinking glass bar, transform/opacity only: the bar is 80px with its
+        content in the bottom 64px; scrolling slides it up 16px (leaving a centred
+        64px bar), scales the logo, and fades in the frosted layer. -mb-4 keeps
+        page layout at the old 64px.
+      */}
+      <header
+        className={`${isHome ? "fixed inset-x-0" : "sticky -mb-4"} top-0 z-40 h-20 transition-transform duration-(--duration-slow) ease-luxe ${
+          scrolled ? "-translate-y-4" : ""
+        }`}
+        // Anchored during route transitions: content slides, the bar stays put.
+        style={{ viewTransitionName: "site-header" }}
+      >
+        <div
+          aria-hidden
+          className={`absolute inset-0 border-b border-border bg-background/75 shadow-hairline backdrop-blur-xl backdrop-saturate-150 transition-opacity duration-(--duration-slow) ease-standard ${
+            glass ? "opacity-100" : "opacity-0"
+          }`}
+        />
+        <div className="container-x relative mt-4 flex h-16 items-center gap-3 sm:gap-4">
           <button
             type="button"
             className="focus-ring -ml-2 inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2 lg:hidden"
@@ -56,7 +82,9 @@ export function Header({ categories }: Props) {
 
           <Link
             href="/"
-            className="shrink-0 font-serif text-xl font-semibold tracking-tight sm:text-2xl"
+            className={`shrink-0 origin-left font-serif text-xl font-semibold tracking-tight transition-transform duration-(--duration-slow) ease-luxe sm:text-2xl ${
+              scrolled ? "scale-[0.92]" : ""
+            }`}
           >
             Beauty<span className="text-accent">.</span>
           </Link>
@@ -85,6 +113,11 @@ export function Header({ categories }: Props) {
             {isAdmin && (
               <NavLink href="/admin" active={isActive("/admin")}>
                 Admin
+              </NavLink>
+            )}
+            {user?.roles.includes("VENDOR") && (
+              <NavLink href="/vendor" active={isActive("/vendor")}>
+                Seller centre
               </NavLink>
             )}
           </nav>
@@ -130,14 +163,17 @@ export function Header({ categories }: Props) {
               <HeartIcon />
               {hydrated && wishlist.length > 0 && <Count n={wishlist.length} />}
             </Link>
-            <Link
-              href="/cart"
-              className="focus-ring relative inline-flex h-11 w-11 items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2"
-              aria-label={`Cart, ${cartCount} items`}
+            <button
+              type="button"
+              onClick={openCart}
+              data-cart-target
+              aria-haspopup="dialog"
+              className="focus-ring relative inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-pill transition-colors duration-(--duration-fast) hover:bg-surface-2"
+              aria-label={`Open bag, ${cartCount} item${cartCount === 1 ? "" : "s"}`}
             >
               <BagIcon />
               {hydrated && cartCount > 0 && <Count n={cartCount} />}
-            </Link>
+            </button>
           </div>
         </div>
       </header>
