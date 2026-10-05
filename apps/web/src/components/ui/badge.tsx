@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 
-export type BadgeTone = "neutral" | "accent" | "gold" | "success" | "warning" | "danger" | "solid";
+export type BadgeTone =
+  | "neutral"
+  | "accent"
+  | "gold"
+  | "success"
+  | "warning"
+  | "danger"
+  | "solid"
+  | "platform";
 
 // Every tone pairs a text token with its own soft background (AA-checked in
 // scripts/check-contrast.mjs); colour is never the only signal — badges carry text.
@@ -12,6 +20,7 @@ const tones: Record<BadgeTone, string> = {
   warning: "bg-warning-soft text-warning",
   danger: "bg-danger-soft text-danger",
   solid: "bg-primary text-primary-foreground",
+  platform: "bg-platform-soft text-platform",
 };
 
 export function Badge({
