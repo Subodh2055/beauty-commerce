@@ -1,5 +1,5 @@
 /**
- * Server-side gate for /admin.
+ * Server-side gate for /admin and /vendor.
  *
  * Next 16 renamed the `middleware` file convention to `proxy`; this runs before
  * the route is rendered, same as before.
@@ -14,14 +14,23 @@
  * that has been revoked, or whose session hit the idle or absolute timeout, is
  * rejected by the same code path that guards every other endpoint.
  *
- * Cost is one internal request per admin *navigation* — the matcher excludes
- * assets and data requests.
+ * Cost is one internal request per admin/vendor *navigation* — the matcher
+ * excludes assets and data requests.
+ *
+ * /vendor rules: the application and its status page only need a signed-in user;
+ * the portal needs the VENDOR role (granted on approval). Anyone else is sent to
+ * the status page, which explains where their application stands. This is a
+ * routing convenience: every /vendor/* API call is separately authorised and
+ * scoped to the caller's own store by the API (vendor isolation).
  */
 
 import { NextResponse, type NextRequest } from "next/server";
 
 const COOKIE_NAME = "bc_at";
 const ADMIN_ROLES = new Set(["STAFF", "ADMIN", "SUPER_ADMIN"]);
+const VENDOR_ROLE = "VENDOR";
+/** Vendor pages any signed-in user may open (apply, check application status). */
+const VENDOR_OPEN = ["/vendor/apply", "/vendor/status"];
 
 const API =
   process.env.API_INTERNAL_URL ||
@@ -64,6 +73,12 @@ export async function proxy(req: NextRequest) {
     return redirect(req, `/login?next=${next}`);
   }
 
+  const path = req.nextUrl.pathname;
+  if (path === "/vendor" || path.startsWith("/vendor/")) {
+    if (VENDOR_OPEN.some((p) => path === p || path.startsWith(`${p}/`))) return NextResponse.next();
+    return roles.includes(VENDOR_ROLE) ? NextResponse.next() : redirect(req, "/vendor/status");
+  }
+
   if (!roles.some((r) => ADMIN_ROLES.has(r))) {
     return redirect(req, "/");
   }
@@ -71,7 +86,7 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Admin pages only — without a matcher this would run on every request,
-  // including static assets.
-  matcher: ["/admin/:path*"],
+  // Admin and vendor pages only — without a matcher this would run on every
+  // request, including static assets.
+  matcher: ["/admin/:path*", "/vendor", "/vendor/:path*"],
 };
