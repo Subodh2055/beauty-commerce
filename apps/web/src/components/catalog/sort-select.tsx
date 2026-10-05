@@ -7,6 +7,7 @@ import { Select } from "@/components/ui/field";
 const OPTIONS: { value: SortOption; label: string }[] = [
   { value: "newest", label: "Newest" },
   { value: "featured", label: "Featured" },
+  { value: "bestselling", label: "Bestselling" },
   { value: "rating", label: "Top rated" },
   { value: "price_asc", label: "Price: low to high" },
   { value: "price_desc", label: "Price: high to low" },
