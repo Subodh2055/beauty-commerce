@@ -7,10 +7,14 @@ export function ProductGrid({
   products,
   priorityCount = 4,
   emptyMessage = "No products match these filters.",
+  morph = false,
 }: {
   products: ProductSummary[];
   priorityCount?: number;
   emptyMessage?: string;
+  /** Name card images so they morph into the product page gallery. Only on
+   * pages where each product appears once (view transition names are unique). */
+  morph?: boolean;
 }) {
   if (products.length === 0) {
     return (
@@ -22,7 +26,7 @@ export function ProductGrid({
       {products.map((p, i) => (
         // Stagger by column position so rows cascade without long tail delays.
         <Reveal key={p.id} index={i % 4}>
-          <ProductCard product={p} priority={i < priorityCount} />
+          <ProductCard product={p} priority={i < priorityCount} morph={morph} />
         </Reveal>
       ))}
     </div>
