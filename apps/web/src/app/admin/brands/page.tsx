@@ -11,10 +11,13 @@ import { Field, Textarea } from "@/components/ui/field";
 import { FormError } from "@/components/auth/auth-card";
 import { ImageUpload } from "@/components/admin/image-upload";
 import { confirmDialog } from "@/components/ui/confirm";
+import { RequirePermission } from "@/components/admin/ui";
+import { useCan } from "@/lib/permissions";
 
 const blank = { name: "", country: "", description: "", logo_url: "", is_active: true };
 
-export default function AdminBrands() {
+function AdminBrandsPage() {
+  const { can } = useCan();
   const admin = useAdmin();
   const [rows, setRows] = useState<AdminBrand[] | null>(null);
   const [editing, setEditing] = useState<AdminBrand | null>(null);
@@ -128,12 +131,16 @@ export default function AdminBrands() {
       header: "Actions",
       cell: (b) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline" className="h-8! px-3! text-xs" onClick={() => edit(b)}>
-            Edit
-          </Button>
-          <Button size="sm" variant="ghost" className="h-8! px-3! text-xs text-danger hover:bg-danger-soft" onClick={() => onDelete(b)}>
-            Delete
-          </Button>
+          {can("taxonomy.edit") && (
+            <Button size="sm" variant="outline" className="h-8! px-3! text-xs" onClick={() => edit(b)}>
+              Edit
+            </Button>
+          )}
+          {can("taxonomy.delete") && (
+            <Button size="sm" variant="ghost" className="h-8! px-3! text-xs text-danger hover:bg-danger-soft" onClick={() => onDelete(b)}>
+              Delete
+            </Button>
+          )}
         </div>
       ),
     },
@@ -152,6 +159,7 @@ export default function AdminBrands() {
         />
       </div>
 
+      {(editing ? can("taxonomy.edit") : can("taxonomy.create")) && (
       <form onSubmit={onSubmit} className="h-fit space-y-3 rounded-card border border-border bg-surface p-5 shadow-soft">
         <h2 className="font-display text-xl font-semibold">{editing ? "Edit brand" : "New brand"}</h2>
         <FormError message={error} />
@@ -177,6 +185,15 @@ export default function AdminBrands() {
           )}
         </div>
       </form>
+      )}
     </div>
+  );
+}
+
+export default function AdminBrands() {
+  return (
+    <RequirePermission code="taxonomy.view">
+      <AdminBrandsPage />
+    </RequirePermission>
   );
 }

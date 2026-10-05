@@ -11,10 +11,13 @@ import { Field, Select, Textarea } from "@/components/ui/field";
 import { FormError } from "@/components/auth/auth-card";
 import { ImageUpload } from "@/components/admin/image-upload";
 import { confirmDialog } from "@/components/ui/confirm";
+import { RequirePermission } from "@/components/admin/ui";
+import { useCan } from "@/lib/permissions";
 
 const blank = { name: "", description: "", image_url: "", parent_id: "", sort_order: 0, is_active: true };
 
-export default function AdminCategories() {
+function AdminCategoriesPage() {
+  const { can } = useCan();
   const admin = useAdmin();
   const [rows, setRows] = useState<AdminCategory[] | null>(null);
   const [editing, setEditing] = useState<AdminCategory | null>(null);
@@ -137,12 +140,16 @@ export default function AdminCategories() {
       header: "Actions",
       cell: (c) => (
         <div className="flex gap-1">
-          <Button size="sm" variant="outline" className="h-8! px-3! text-xs" onClick={() => edit(c)}>
-            Edit
-          </Button>
-          <Button size="sm" variant="ghost" className="h-8! px-3! text-xs text-danger hover:bg-danger-soft" onClick={() => onDelete(c)}>
-            Delete
-          </Button>
+          {can("taxonomy.edit") && (
+            <Button size="sm" variant="outline" className="h-8! px-3! text-xs" onClick={() => edit(c)}>
+              Edit
+            </Button>
+          )}
+          {can("taxonomy.delete") && (
+            <Button size="sm" variant="ghost" className="h-8! px-3! text-xs text-danger hover:bg-danger-soft" onClick={() => onDelete(c)}>
+              Delete
+            </Button>
+          )}
         </div>
       ),
     },
@@ -161,6 +168,7 @@ export default function AdminCategories() {
         />
       </div>
 
+      {(editing ? can("taxonomy.edit") : can("taxonomy.create")) && (
       <form onSubmit={onSubmit} className="h-fit space-y-3 rounded-card border border-border bg-surface p-5 shadow-soft">
         <h2 className="font-display text-xl font-semibold">{editing ? "Edit category" : "New category"}</h2>
         <FormError message={error} />
@@ -194,6 +202,15 @@ export default function AdminCategories() {
           )}
         </div>
       </form>
+      )}
     </div>
+  );
+}
+
+export default function AdminCategories() {
+  return (
+    <RequirePermission code="taxonomy.view">
+      <AdminCategoriesPage />
+    </RequirePermission>
   );
 }
