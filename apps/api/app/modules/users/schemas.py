@@ -30,3 +30,8 @@ class AddressOut(BaseModel):
     postal_code: str | None = None
     country: str
     is_default: bool
+
+
+class ProfileIn(BaseModel):
+    full_name: str = Field(min_length=1, max_length=255)
+    phone: str | None = Field(default=None, max_length=30)
