@@ -12,6 +12,7 @@ import { AccountShell } from "@/components/account/account-shell";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OrderStatusBadge, PaymentStatusBadge, label } from "@/components/order/status-badge";
+import { ReturnRequests } from "@/components/order/return-request";
 import { OrderTracking } from "@/components/order/order-tracking";
 import { confirmDialog } from "@/components/ui/confirm";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -171,6 +172,8 @@ function OrderView() {
                 </ul>
               </section>
 
+              <ReturnRequests order={order} />
+
               <section aria-labelledby="activity-title" className="rounded-panel border border-border bg-surface p-6 shadow-soft">
                 <h2 id="activity-title" className="mb-4 font-display text-xl font-semibold">
                   Activity
@@ -205,7 +208,11 @@ function OrderView() {
                     label="Shipping"
                     value={Number(order.shipping_fee) === 0 ? "Free" : formatMoney(order.shipping_fee, order.currency)}
                   />
-                  <Row label="VAT (incl.)" value={formatMoney(order.tax_total, order.currency)} muted />
+                  <Row
+                    label={taxAdded(order) ? "VAT" : "VAT (incl.)"}
+                    value={formatMoney(order.tax_total, order.currency)}
+                    muted={!taxAdded(order)}
+                  />
                   <div className="border-t border-border pt-2">
                     <Row label="Total" value={formatMoney(order.total, order.currency)} strong />
                   </div>
@@ -240,6 +247,12 @@ function OrderView() {
       )}
     </AccountShell>
   );
+}
+
+/** Tax was charged on top (prices set to exclude tax) when the total includes it. */
+function taxAdded(o: OrderDetail): boolean {
+  const base = Number(o.subtotal) - Number(o.discount_total) + Number(o.shipping_fee);
+  return Number(o.tax_total) > 0 && Math.abs(Number(o.total) - base - Number(o.tax_total)) < 0.01;
 }
 
 function Row({ label, value, strong, muted }: { label: string; value: string; strong?: boolean; muted?: boolean }) {
