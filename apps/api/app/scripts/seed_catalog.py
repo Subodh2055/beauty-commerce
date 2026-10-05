@@ -36,6 +36,8 @@ from app.modules.catalog.models import (
 )
 from app.modules.catalog.service import slugify
 from app.modules.cms.models import Banner
+from app.modules.reviews.models import Review
+from app.modules.reviews.repository import recompute_product_rating
 from app.modules.users.models import Role, User
 from app.modules.vendors.models import Vendor
 from app.shared.enums import Gender, ProductStatus, VendorStatus
@@ -1065,6 +1067,96 @@ async def _seed_vendors(db, tax: _Taxonomy) -> None:
     log.info("seed_vendors_done", vendors=len(VENDORS))
 
 
+# Demo reviews for the storefront testimonials (dev only, like the demo vendors).
+DEMO_REVIEWS = [
+    (
+        "Aarati Gurung",
+        "oud-nocturne",
+        5,
+        "Worth every rupee",
+        "Saffron up top, then the oud settles into something warm and quiet. Lasts all day on me "
+        "and I still catch it on my scarf the next morning.",
+    ),
+    (
+        "Rohan Thapa",
+        "mitti-attar",
+        5,
+        "Smells exactly like the first monsoon rain",
+        "I bought it as a curiosity and now I reach for it daily. Two dabs on the wrist is plenty; "
+        "the sandalwood dry-down is beautiful.",
+    ),
+    (
+        "Sneha Maharjan",
+        "rice-ferment-glow-serum",
+        4,
+        "My skin looks rested",
+        "Light, absorbs fast and doesn't pill under sunscreen. A couple of weeks in and my tone "
+        "is noticeably more even.",
+    ),
+    (
+        "Prakash Rai",
+        "shamama-royal-attar",
+        5,
+        "A proper winter fragrance",
+        "Dense, spiced and very long-lasting. It's an oil, so it stays close to the skin, which "
+        "is exactly what I wanted for the office.",
+    ),
+    (
+        "Isha Shrestha",
+        "daily-mineral-sun-fluid-spf50",
+        5,
+        "Finally, no white cast",
+        "I've tried a dozen mineral sunscreens and this is the first that disappears on my skin. "
+        "Wears well under makeup too.",
+    ),
+    (
+        "Nabin K.C.",
+        "oud-nocturne",
+        4,
+        "Beautiful, if a little strong",
+        "Gorgeous rose and oud. I'd go one spray rather than two in summer, but in the evenings "
+        "it's perfect.",
+    ),
+]
+
+
+async def _seed_reviews(db) -> None:
+    if settings.is_production:
+        return
+    if await db.scalar(select(func.count()).select_from(Review)):
+        log.info("seed_reviews_skipped", reason="reviews already exist")
+        return
+    products = {p.slug: p for p in await db.scalars(select(Product))}
+    customer = await db.scalar(select(Role).where(Role.name == "CUSTOMER"))
+    touched = {}
+    for name, slug, rating, title, body in DEMO_REVIEWS:
+        product = products.get(slug)
+        if product is None:
+            continue
+        email = f"{slugify(name, 'shopper')}@shoppers.example.com"
+        user = await db.scalar(select(User).where(User.email == email))
+        if user is None:
+            user = User(email=email, full_name=name, is_email_verified=True, roles=[customer])
+            db.add(user)
+            await db.flush()
+        db.add(
+            Review(
+                product_id=product.id,
+                user_id=user.id,
+                rating=rating,
+                title=title,
+                body=body,
+                author_name=name,
+                is_verified_purchase=False,
+            )
+        )
+        touched[product.id] = product
+    await db.flush()
+    for product in touched.values():
+        await recompute_product_rating(db, product)
+    log.info("seed_reviews_done", reviews=len(DEMO_REVIEWS))
+
+
 async def _seed_banners(db) -> None:
     if await db.scalar(select(func.count()).select_from(Banner)):
         log.info("seed_banners_skipped", reason="banners already exist")
@@ -1085,6 +1177,8 @@ async def seed() -> None:
         await _seed_catalog(db, tax)
         await _seed_vendors(db, tax)
         await _seed_banners(db)
+        await db.flush()
+        await _seed_reviews(db)
         await db.commit()
     await cache.drain()  # let the commit's catalog-cache invalidation finish
     log.info("seed_done")
