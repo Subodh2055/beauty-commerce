@@ -51,6 +51,15 @@ async def related_products(db: DbSession, slug: str) -> list[ProductSummary]:
     return await service.related_products(db, slug)
 
 
+@products_router.get(
+    "/{slug}/similar",
+    response_model=list[ProductSummary],
+    summary="Similar scents (shared notes, same family)",
+)
+async def similar_scents(db: DbSession, slug: str) -> list[ProductSummary]:
+    return await service.similar_scents(db, slug)
+
+
 @categories_router.get("", response_model=list[CategoryTree], summary="Category tree")
 async def category_tree(db: DbSession) -> list[CategoryTree]:
     return await service.category_tree(db)
