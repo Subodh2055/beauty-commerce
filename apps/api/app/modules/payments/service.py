@@ -28,6 +28,7 @@ from app.modules.payments.schemas import (
     StubPaymentOut,
     StubPaymentResult,
 )
+from app.modules.settings import service as settings_service
 from app.shared.enums import OrderStatus, PaymentMethod, PaymentStatus
 
 log = get_logger(__name__)
@@ -40,10 +41,13 @@ _METHOD_COPY: dict[PaymentMethod, tuple[str, str]] = {
 }
 
 
-def list_methods() -> list[PaymentMethodOut]:
+async def list_methods(db: AsyncSession) -> list[PaymentMethodOut]:
+    """Every method with whether checkout takes it now: switched on in platform
+    settings and, for online methods, a provider configured on the server."""
+    enabled = set((await settings_service.get_settings(db)).payments.enabled_methods)
     out = []
     for method, (label, description) in _METHOD_COPY.items():
-        available = is_available(method)
+        available = method in enabled and is_available(method)
         out.append(
             PaymentMethodOut(
                 method=method,

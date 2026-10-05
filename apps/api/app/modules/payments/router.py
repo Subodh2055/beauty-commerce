@@ -24,8 +24,8 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
     response_model=list[PaymentMethodOut],
     summary="Checkout payment options and whether each is available",
 )
-async def payment_methods() -> list[PaymentMethodOut]:
-    return service.list_methods()
+async def payment_methods(db: DbSession) -> list[PaymentMethodOut]:
+    return await service.list_methods(db)
 
 
 @router.get(
