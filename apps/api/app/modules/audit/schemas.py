@@ -35,4 +35,5 @@ class AuditLogOut(BaseModel):
     request_method: str | None
     request_path: str | None
     request_id: str | None
+    ip_address: str | None = None
     created_at: datetime

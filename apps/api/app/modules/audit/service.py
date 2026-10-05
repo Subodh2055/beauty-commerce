@@ -189,12 +189,20 @@ async def list_logs(
     actor_id: uuid.UUID | None = None,
     entity_type: str | None = None,
     entity_id: str | None = None,
+    action: str | None = None,
+    q: str | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
 ) -> Page[AuditLogOut]:
     rows, total = await repo.list_logs(
         db,
         actor_id=actor_id,
         entity_type=entity_type,
         entity_id=entity_id,
+        action=action,
+        q=q,
+        since=since,
+        until=until,
         offset=page.offset,
         limit=page.size,
     )
@@ -204,3 +212,7 @@ async def list_logs(
         page=page.page,
         size=page.size,
     )
+
+
+async def entity_types(db: AsyncSession) -> list[str]:
+    return await repo.entity_types(db)
