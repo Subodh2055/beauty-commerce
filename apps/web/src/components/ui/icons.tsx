@@ -291,3 +291,127 @@ export const ClockIcon = (p: P) => (
     <path d="M12 8v4l2.5 2" />
   </svg>
 );
+
+export const ShieldIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M12 3 5 6v5c0 4.4 3 8.3 7 10 4-1.7 7-5.6 7-10V6l-7-3Z" />
+    <path d="m9 12 2 2 4-4" />
+  </svg>
+);
+
+export const ChartIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M4 20V4" />
+    <path d="M4 20h16" />
+    <path d="M8 16v-5M12 16V8M16 16v-3" />
+  </svg>
+);
+
+export const ReturnIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </svg>
+);
+
+export const UsersIcon = (p: P) => (
+  <svg {...d(p)}>
+    <circle cx="9" cy="8" r="3.5" />
+    <path d="M2.5 20a6.5 6.5 0 0 1 13 0" />
+    <path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6.5 6.5 0 0 1 3.5 6" />
+  </svg>
+);
+
+export const TagIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M3 12V4h8l9 9-8 8-9-9Z" />
+    <circle cx="7.5" cy="8.5" r="1.25" />
+  </svg>
+);
+
+export const ImageIcon = (p: P) => (
+  <svg {...d(p)}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="1.75" />
+    <path d="m21 16-5-5-8 9" />
+  </svg>
+);
+
+export const ChatIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M4 5h16v11H9l-5 4V5Z" />
+    <path d="M8 10h8M8 13h5" />
+  </svg>
+);
+
+export const StoreIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M4 9 5.5 4h13L20 9" />
+    <path d="M4 9a2.67 2.67 0 0 0 5.33 0 2.67 2.67 0 0 0 5.34 0A2.67 2.67 0 0 0 20 9" />
+    <path d="M5 11v9h14v-9M10 20v-5h4v5" />
+  </svg>
+);
+
+export const ActivityIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M3 12h4l3-8 4 16 3-8h4" />
+  </svg>
+);
+
+export const KeyIcon = (p: P) => (
+  <svg {...d(p)}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="m11 12 9-9M16 7l3 3M14 9l2 2" />
+  </svg>
+);
+
+export const PercentIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M19 5 5 19" />
+    <circle cx="7" cy="7" r="2.5" />
+    <circle cx="17" cy="17" r="2.5" />
+  </svg>
+);
+
+export const HistoryIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+    <path d="M3 3v5h5M12 7v5l3 2" />
+  </svg>
+);
+
+export const RefreshIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M20 11a8 8 0 0 0-14.9-3.5L4 9" />
+    <path d="M4 4v5h5M4 13a8 8 0 0 0 14.9 3.5L20 15" />
+    <path d="M20 20v-5h-5" />
+  </svg>
+);
+
+export const BellIcon = (p: P) => (
+  <svg {...d(p)}>
+    <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16Z" />
+    <path d="M10 20a2 2 0 0 0 4 0" />
+  </svg>
+);
+
+export const CalendarIcon = (p: P) => (
+  <svg {...d(p)}>
+    <rect x="3.5" y="5" width="17" height="15" rx="2" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </svg>
+);
+
+export const LockIcon = (p: P) => (
+  <svg {...d(p)}>
+    <rect x="5" y="11" width="14" height="10" rx="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+  </svg>
+);
+
+export const BanIcon = (p: P) => (
+  <svg {...d(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m5.7 5.7 12.6 12.6" />
+  </svg>
+);
