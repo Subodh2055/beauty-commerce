@@ -364,7 +364,11 @@ def apply_status_to_vendor_orders(order: Order, status: str) -> None:
             if vo.status == VendorOrderStatus.PENDING:
                 vo.status = VendorOrderStatus.PROCESSING
         elif status == OrderStatus.SHIPPED:
-            if vo.status in (VendorOrderStatus.PENDING, VendorOrderStatus.PROCESSING):
+            if vo.status in (
+                VendorOrderStatus.PENDING,
+                VendorOrderStatus.PROCESSING,
+                VendorOrderStatus.PACKED,
+            ):
                 vo.status, vo.shipped_at = VendorOrderStatus.SHIPPED, vo.shipped_at or now
         elif status == OrderStatus.DELIVERED:
             vo.status = VendorOrderStatus.DELIVERED
@@ -395,8 +399,11 @@ def sync_parent_status(order: Order) -> str | None:
 
 # --- Vendor portal ------------------------------------------------------------
 
+# The seller's pipeline: new (PROCESSING) → packed → shipped → delivered. Packing is
+# optional, so a new order may also go straight to shipped.
 VENDOR_TRANSITIONS: dict[str, set[str]] = {
-    VendorOrderStatus.PROCESSING: {VendorOrderStatus.SHIPPED},
+    VendorOrderStatus.PROCESSING: {VendorOrderStatus.PACKED, VendorOrderStatus.SHIPPED},
+    VendorOrderStatus.PACKED: {VendorOrderStatus.SHIPPED},
     VendorOrderStatus.SHIPPED: {VendorOrderStatus.DELIVERED},
 }
 
