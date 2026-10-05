@@ -53,7 +53,10 @@ Paging = Annotated[PageParams, Depends(page_params)]
 router = APIRouter()
 portal_router = APIRouter(dependencies=[Audited])
 admin_router = APIRouter(dependencies=[Audited])
-VendorAdmin = Annotated[User, Depends(require_permission(Permission.VENDORS_MANAGE))]
+VendorsView = Annotated[User, Depends(require_permission(Permission.VENDORS_VIEW))]
+VendorAdmin = Annotated[User, Depends(require_permission(Permission.VENDORS_EDIT))]
+# Commission is a platform-wide money rule: super admin only (commission.edit).
+CommissionAdmin = Annotated[User, Depends(require_permission(Permission.COMMISSION_EDIT))]
 
 
 # --- /vendors -----------------------------------------------------------------
@@ -254,7 +257,7 @@ async def portal_upload(
 @admin_router.get("", response_model=Page[VendorOut])
 async def admin_list_vendors(
     db: DbSession,
-    _: VendorAdmin,
+    _: VendorsView,
     page: Paging,
     status: str | None = Query(default=None),
     q: str | None = Query(default=None, max_length=100),
@@ -263,7 +266,7 @@ async def admin_list_vendors(
 
 
 @admin_router.get("/{vendor_id}", response_model=VendorOut)
-async def admin_get_vendor(vendor_id: uuid.UUID, db: DbSession, _: VendorAdmin) -> VendorOut:
+async def admin_get_vendor(vendor_id: uuid.UUID, db: DbSession, _: VendorsView) -> VendorOut:
     return await service.get_vendor(db, vendor_id)
 
 
@@ -297,6 +300,6 @@ async def admin_reinstate(
 
 @admin_router.put("/{vendor_id}/commission", response_model=VendorOut)
 async def admin_commission(
-    vendor_id: uuid.UUID, body: CommissionIn, db: DbSession, _: VendorAdmin
+    vendor_id: uuid.UUID, body: CommissionIn, db: DbSession, _: CommissionAdmin
 ) -> VendorOut:
     return await service.set_commission(db, vendor_id, body.commission_rate)
