@@ -1,6 +1,5 @@
 import uuid
-from datetime import datetime
-from decimal import Decimal
+from datetime import UTC, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,8 +29,6 @@ async def get_variants_for_update(
 async def next_order_number(db: AsyncSession) -> str:
     # BC-YYYY-NNNNN, sequential-ish by count. Uniqueness enforced by the column.
     count = await db.scalar(select(func.count()).select_from(Order)) or 0
-    from datetime import UTC, datetime
-
     year = datetime.now(UTC).year
     return f"BC-{year}-{count + 1:05d}"
 
@@ -50,18 +47,6 @@ async def get_order_for_user(
     db: AsyncSession, order_id: uuid.UUID, user_id: uuid.UUID
 ) -> Order | None:
     return await db.scalar(select(Order).where(Order.id == order_id, Order.user_id == user_id))
-
-
-async def order_totals_by_status(
-    db: AsyncSession, start: datetime, end: datetime
-) -> dict[str, tuple[int, Decimal]]:
-    """`{status: (order_count, sum_of_totals)}` for orders created in [start, end)."""
-    stmt = (
-        select(Order.status, func.count(Order.id), func.coalesce(func.sum(Order.total), 0))
-        .where(Order.created_at >= start, Order.created_at < end)
-        .group_by(Order.status)
-    )
-    return {status: (count, Decimal(total)) for status, count, total in (await db.execute(stmt))}
 
 
 # --- Vendor-scoped access -----------------------------------------------------
