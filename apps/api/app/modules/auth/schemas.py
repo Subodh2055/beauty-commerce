@@ -34,6 +34,8 @@ class UserOut(BaseModel):
     phone: str | None = None
     is_email_verified: bool
     roles: list[str]
+    # Effective permission codes, so the web app can hide what the API would refuse.
+    permissions: list[str] = []
 
 
 class AuthResult(BaseModel):

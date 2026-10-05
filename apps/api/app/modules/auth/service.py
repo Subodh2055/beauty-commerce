@@ -80,6 +80,7 @@ def to_user_out(user: User) -> UserOut:
         phone=user.phone,
         is_email_verified=user.is_email_verified,
         roles=[r.name for r in user.roles],
+        permissions=sorted(user.permission_codes),
     )
 
 
