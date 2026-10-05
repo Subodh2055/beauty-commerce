@@ -7,13 +7,19 @@ same transaction, so the catalogue and product pages stay consistent.
 import uuid
 from decimal import Decimal
 
+from pydantic import TypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import cache
 from app.core.exceptions import NotFoundError
 from app.modules.reviews import repository as repo
 from app.modules.reviews.models import Review
 from app.modules.reviews.schemas import (
+    FeaturedReview,
+    MyReview,
+    MyReviewProduct,
     RatingBreakdown,
+    ReviewedProduct,
     ReviewIn,
     ReviewList,
     ReviewOut,
@@ -93,3 +99,50 @@ async def delete_my_review(db: AsyncSession, slug: str, user_id: uuid.UUID) -> N
     await db.flush()
     await repo.recompute_product_rating(db, product)
     await db.commit()
+
+
+def short_author(name: str) -> str:
+    """Public attribution keeps only a first name and an initial."""
+    parts = name.split()
+    if not parts:
+        return "Verified customer"
+    return parts[0] if len(parts) == 1 else f"{parts[0]} {parts[-1][0]}."
+
+
+async def featured_reviews(db: AsyncSession, limit: int = 12) -> list[FeaturedReview]:
+    async def load() -> list[FeaturedReview]:
+        rows = await repo.featured(db, limit=limit, min_rating=4, min_length=40)
+        return [
+            FeaturedReview(
+                id=r.id,
+                rating=r.rating,
+                title=r.title,
+                body=r.body or "",
+                author=short_author(r.author_name),
+                is_verified_purchase=r.is_verified_purchase,
+                product=ReviewedProduct(name=name, slug=slug),
+            )
+            for r, name, slug in rows
+        ]
+
+    # Review writes recompute the product's rating, which invalidates "catalog".
+    return await cache.get_or_load("catalog", f"featured-reviews:{limit}", _FEATURED, load)
+
+
+_FEATURED = TypeAdapter(list[FeaturedReview])
+
+
+async def my_reviews(db: AsyncSession, user_id: uuid.UUID) -> list[MyReview]:
+    return [
+        MyReview(
+            id=r.id,
+            rating=r.rating,
+            title=r.title,
+            body=r.body,
+            is_verified_purchase=r.is_verified_purchase,
+            created_at=r.created_at,
+            updated_at=r.updated_at,
+            product=MyReviewProduct(name=name, slug=slug, image_url=image_url),
+        )
+        for r, name, slug, image_url in await repo.list_user_reviews(db, user_id)
+    ]
