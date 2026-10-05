@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useStore } from "@/lib/store";
+import { shippingFor, useShippingRules } from "@/lib/shipping";
 import { toast } from "@/lib/toast";
 import { formatMoney, pluralize } from "@/lib/format";
 import { Button, ButtonLink } from "@/components/ui/button";
@@ -10,12 +11,10 @@ import { BagIcon, MinusIcon, PlusIcon, TrashIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 
-const FREE_SHIPPING_THRESHOLD = 5000;
-const SHIPPING_FEE = 150;
-
 export function CartView() {
   const { cart, hydrated, setQuantity, removeFromCart, clearCart, cartSubtotal, cartCount } =
     useStore();
+  const rules = useShippingRules();
 
   function remove(variantId: string, name: string) {
     removeFromCart(variantId);
@@ -49,9 +48,9 @@ export function CartView() {
   }
 
   const currency = cart[0].currency;
-  const shipping = cartSubtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+  const shipping = shippingFor(cartSubtotal, rules);
   const total = cartSubtotal + shipping;
-  const toFree = FREE_SHIPPING_THRESHOLD - cartSubtotal;
+  const toFree = rules.freeThreshold - cartSubtotal;
 
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_360px]">
