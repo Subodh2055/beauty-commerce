@@ -6,6 +6,7 @@ and worker share that directory through the `uploads_data` volume. Swap
 `_storage_dir`/`_url` for S3/R2 later without touching callers.
 """
 
+import asyncio
 import io
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -66,7 +67,12 @@ def enqueue_processing(asset_id: uuid.UUID) -> None:
     from app.workers.celery_app import celery_app
 
     try:
-        celery_app.send_task("media.process_image", args=[str(asset_id)], retry=False)
+        # ignore_result: nobody waits for this task's result, and without it the Redis
+        # result backend retries its connection (~20 times) before giving up, so a
+        # broker outage would hold the upload request open instead of failing fast.
+        celery_app.send_task(
+            "media.process_image", args=[str(asset_id)], retry=False, ignore_result=True
+        )
     except Exception as exc:  # noqa: BLE001
         log.warning("media_enqueue_failed", asset_id=str(asset_id), error=str(exc))
 
@@ -109,7 +115,9 @@ async def upload(
     )
     db.add(asset)
     await db.commit()
-    enqueue_processing(asset.id)  # after commit, so the worker can see the row
+    # After commit, so the worker can see the row. Off the event loop: publishing is a
+    # blocking network call and must not stall other requests if the broker is slow.
+    await asyncio.to_thread(enqueue_processing, asset.id)
     return to_out(asset)
 
 
