@@ -22,23 +22,61 @@ class OrderStatus(StrEnum):
 
 
 class Permission(StrEnum):
-    """Fine-grained grants, attached to roles via `role_permissions`.
+    """Fine-grained grants, `<module>.<action>`, attached to roles via
+    `role_permissions`. The matrix layout (module x view/create/edit/delete) and
+    which codes are super-admin-only live in `app.shared.permissions`.
     SUPER_ADMIN passes every check regardless of rows."""
 
-    DASHBOARD_READ = "dashboard.read"
-    CATALOG_MANAGE = "catalog.manage"
-    CATALOG_MODERATE = "catalog.moderate"
-    ORDERS_MANAGE = "orders.manage"
-    INVENTORY_MANAGE = "inventory.manage"
-    COUPONS_MANAGE = "coupons.manage"
-    VENDORS_MANAGE = "vendors.manage"
-    PAYOUTS_MANAGE = "payouts.manage"
-    CMS_MANAGE = "cms.manage"
-    SUPPORT_MANAGE = "support.manage"
-    SETTINGS_MANAGE = "settings.manage"
-    AUDIT_READ = "audit.read"
+    DASHBOARD_VIEW = "dashboard.view"
+    ANALYTICS_VIEW = "analytics.view"
+    ORDERS_VIEW = "orders.view"
+    ORDERS_EDIT = "orders.edit"
+    RETURNS_VIEW = "returns.view"
+    RETURNS_EDIT = "returns.edit"
+    PRODUCTS_VIEW = "products.view"
+    PRODUCTS_CREATE = "products.create"
+    PRODUCTS_EDIT = "products.edit"
+    PRODUCTS_DELETE = "products.delete"
+    MODERATION_VIEW = "moderation.view"
+    MODERATION_EDIT = "moderation.edit"
+    TAXONOMY_VIEW = "taxonomy.view"
+    TAXONOMY_CREATE = "taxonomy.create"
+    TAXONOMY_EDIT = "taxonomy.edit"
+    TAXONOMY_DELETE = "taxonomy.delete"
+    INVENTORY_VIEW = "inventory.view"
+    INVENTORY_EDIT = "inventory.edit"
+    COUPONS_VIEW = "coupons.view"
+    COUPONS_CREATE = "coupons.create"
+    COUPONS_EDIT = "coupons.edit"
+    COUPONS_DELETE = "coupons.delete"
+    VENDORS_VIEW = "vendors.view"
+    VENDORS_EDIT = "vendors.edit"
+    PAYOUTS_VIEW = "payouts.view"
+    PAYOUTS_CREATE = "payouts.create"
+    PAYOUTS_EDIT = "payouts.edit"
+    CUSTOMERS_VIEW = "customers.view"
+    CUSTOMERS_EDIT = "customers.edit"
+    CMS_VIEW = "cms.view"
+    CMS_CREATE = "cms.create"
+    CMS_EDIT = "cms.edit"
+    CMS_DELETE = "cms.delete"
+    SUPPORT_VIEW = "support.view"
+    SUPPORT_EDIT = "support.edit"
     MEDIA_UPLOAD = "media.upload"
     VENDOR_PORTAL = "vendor.portal"
+    # Super admin only: never granted to another role (see shared/permissions.py).
+    ADMINS_VIEW = "admins.view"
+    ADMINS_EDIT = "admins.edit"
+    ROLES_VIEW = "roles.view"
+    ROLES_CREATE = "roles.create"
+    ROLES_EDIT = "roles.edit"
+    ROLES_DELETE = "roles.delete"
+    COMMISSION_VIEW = "commission.view"
+    COMMISSION_EDIT = "commission.edit"
+    SETTINGS_VIEW = "settings.view"
+    SETTINGS_EDIT = "settings.edit"
+    AUDIT_VIEW = "audit.view"
+    SYSTEM_VIEW = "system.view"
 
 
 class ProductStatus(StrEnum):
@@ -80,6 +118,16 @@ class VendorOrderStatus(StrEnum):
     SHIPPED = "SHIPPED"
     DELIVERED = "DELIVERED"
     CANCELLED = "CANCELLED"
+    REFUNDED = "REFUNDED"
+
+
+class ReturnStatus(StrEnum):
+    """REQUESTED → APPROVED → RECEIVED → REFUNDED, or REJECTED at review."""
+
+    REQUESTED = "REQUESTED"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    RECEIVED = "RECEIVED"
     REFUNDED = "REFUNDED"
 
 
