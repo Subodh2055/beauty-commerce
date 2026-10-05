@@ -6,6 +6,8 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin, UUIDMixin
+from app.shared.enums import Permission as PermissionCode
+from app.shared.permissions import SUPER_ADMIN_ONLY
 
 user_roles = Table(
     "user_roles",
@@ -76,13 +78,21 @@ class User(UUIDMixin, TimestampMixin, Base):
         return any(r.name in names for r in self.roles)
 
     @property
+    def is_super_admin(self) -> bool:
+        return self.has_role("SUPER_ADMIN")
+
+    @property
     def permission_codes(self) -> set[str]:
-        return {p.code for r in self.roles for p in r.permissions}
+        """Effective grants. SUPER_ADMIN holds every code; for anyone else a
+        super-admin-only row is ignored even if one was inserted by hand."""
+        if self.is_super_admin:
+            return {p.value for p in PermissionCode}
+        return {p.code for r in self.roles for p in r.permissions} - SUPER_ADMIN_ONLY
 
     def has_permission(self, code: str) -> bool:
         # SUPER_ADMIN is unrestricted, including for permissions added after its
         # role_permissions rows were seeded.
-        return self.has_role("SUPER_ADMIN") or code in self.permission_codes
+        return self.is_super_admin or code in self.permission_codes
 
 
 class Address(UUIDMixin, TimestampMixin, Base):
