@@ -24,18 +24,20 @@ router = APIRouter(dependencies=[Audited])
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 Paging = Annotated[PageParams, Depends(page_params)]
-PayoutAdmin = Annotated[User, Depends(require_permission(Permission.PAYOUTS_MANAGE))]
+PayoutsView = Annotated[User, Depends(require_permission(Permission.PAYOUTS_VIEW))]
+PayoutsCreate = Annotated[User, Depends(require_permission(Permission.PAYOUTS_CREATE))]
+PayoutsEdit = Annotated[User, Depends(require_permission(Permission.PAYOUTS_EDIT))]
 
 
 @router.get("/balances", response_model=list[VendorBalance], summary="What each vendor is owed")
-async def balances(db: DbSession, _: PayoutAdmin) -> list[VendorBalance]:
+async def balances(db: DbSession, _: PayoutsView) -> list[VendorBalance]:
     return await service.balances(db)
 
 
 @router.get("", response_model=Page[PayoutOut])
 async def list_payouts(
     db: DbSession,
-    _: PayoutAdmin,
+    _: PayoutsView,
     page: Paging,
     vendor_id: Annotated[uuid.UUID | None, Query()] = None,
     status: str | None = Query(default=None),
@@ -49,22 +51,22 @@ async def list_payouts(
     status_code=status.HTTP_201_CREATED,
     summary="Bundle a vendor's eligible orders into a payout",
 )
-async def create_payout(body: PayoutCreateIn, db: DbSession, admin: PayoutAdmin) -> PayoutDetail:
+async def create_payout(body: PayoutCreateIn, db: DbSession, admin: PayoutsCreate) -> PayoutDetail:
     return await service.generate(db, body.vendor_id, admin.id, body.note)
 
 
 @router.get("/{payout_id}", response_model=PayoutDetail)
-async def get_payout(payout_id: uuid.UUID, db: DbSession, _: PayoutAdmin) -> PayoutDetail:
+async def get_payout(payout_id: uuid.UUID, db: DbSession, _: PayoutsView) -> PayoutDetail:
     return await service.get_payout(db, payout_id)
 
 
 @router.post("/{payout_id}/mark-paid", response_model=PayoutDetail)
 async def mark_paid(
-    payout_id: uuid.UUID, body: PayoutPaidIn, db: DbSession, _: PayoutAdmin
+    payout_id: uuid.UUID, body: PayoutPaidIn, db: DbSession, _: PayoutsEdit
 ) -> PayoutDetail:
     return await service.mark_paid(db, payout_id, body.reference)
 
 
 @router.post("/{payout_id}/cancel", response_model=PayoutDetail)
-async def cancel_payout(payout_id: uuid.UUID, db: DbSession, _: PayoutAdmin) -> PayoutDetail:
+async def cancel_payout(payout_id: uuid.UUID, db: DbSession, _: PayoutsEdit) -> PayoutDetail:
     return await service.cancel(db, payout_id)
