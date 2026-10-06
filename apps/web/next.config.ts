@@ -11,6 +11,8 @@ const nextConfig: NextConfig = {
   // Standalone output keeps the production Docker image small.
   output: "standalone",
   images: {
+    // AVIF first (smallest), WebP fallback; the optimiser picks per browser.
+    formats: ["image/avif", "image/webp"],
     remotePatterns: [
       // Demo seed images. Replace with the real product CDN host.
       { protocol: "https", hostname: "picsum.photos" },
