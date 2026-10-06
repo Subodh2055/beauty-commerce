@@ -23,7 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from alembic import command
-from app.core import cache
+from app.core import cache, ratelimit
+from app.core.config import settings
 from app.core.database import get_db
 from app.main import app
 
@@ -47,6 +48,24 @@ def memory_cache() -> Iterator[cache.MemoryCache]:
     previous = cache.set_backend(backend)
     yield backend
     cache.set_backend(previous)
+
+
+@pytest.fixture(autouse=True)
+def fresh_rate_limits() -> Iterator[None]:
+    """Each test starts with empty rate-limit counters (and never touches Redis)."""
+    previous = ratelimit.set_counter(ratelimit.MemoryCounter())
+    yield
+    ratelimit.set_counter(previous)
+
+
+@pytest.fixture(autouse=True)
+def embeddings_offline(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """No broker in tests: product writes don't queue re-embeds (tests that need
+    vectors embed inline), and the provider is the offline hashing model."""
+    monkeypatch.setattr(settings, "embedding_enqueue_on_write", False)
+    monkeypatch.setattr(settings, "embedding_provider", "local")
+    monkeypatch.setattr(settings, "embedding_model", "")
+    yield
 
 
 @pytest.fixture
