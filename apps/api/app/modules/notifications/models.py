@@ -32,4 +32,6 @@ class Notification(UUIDMixin, Base):
     error: Mapped[str | None] = mapped_column(String(255))
     payload: Mapped[dict] = mapped_column(JSONB, default=dict, nullable=False)
     body_text: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
