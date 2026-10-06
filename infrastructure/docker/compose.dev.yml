@@ -53,6 +53,7 @@ services:
   api:
     build:
       context: ../../apps/api
+      target: dev
     <<: *api-env
     command: >
       sh -c "alembic upgrade head &&
@@ -81,6 +82,7 @@ services:
   worker:
     build:
       context: ../../apps/api
+      target: dev
     <<: *api-env
     command: celery -A app.workers.celery_app worker --loglevel=info
     volumes:
@@ -101,6 +103,7 @@ services:
   beat:
     build:
       context: ../../apps/api
+      target: dev
     <<: *api-env
     # One beat per deployment, or scheduled jobs run twice.
     command: celery -A app.workers.celery_app beat --loglevel=info --schedule /tmp/celerybeat-schedule
@@ -113,7 +116,7 @@ services:
         condition: service_healthy
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.41.7  # pinned; bump deliberately after reading the changelog
     restart: unless-stopped
     environment:
       N8N_HOST: localhost
