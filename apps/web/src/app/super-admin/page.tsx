@@ -55,7 +55,7 @@ export default function SuperAdminHome() {
         )}
       </section>
 
-      <div className="grid gap-8 xl:grid-cols-[1fr_22rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <ul className="grid gap-3 sm:grid-cols-2">
           {AREAS.map((a) => {
             const I = a.icon;
@@ -91,7 +91,7 @@ export default function SuperAdminHome() {
             <ol className="divide-y divide-border rounded-card border border-border bg-surface text-sm">
               {recent.data.items.map((l) => (
                 <li key={l.id} className="px-4 py-2.5">
-                  <span className="block font-mono text-xs">{l.action}</span>
+                  <span className="block font-mono text-xs break-all">{l.action}</span>
                   <span className="block truncate text-xs text-muted">
                     {l.actor_email ?? "system"} · {relTime(l.created_at)}
                   </span>
