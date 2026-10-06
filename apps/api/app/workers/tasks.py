@@ -5,20 +5,36 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
 import redis
+import sqlalchemy.exc
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 import app.models  # noqa: F401 — register every mapper before querying
 from app.core.config import settings
 from app.core.logging import get_logger
+from app.integrations.embeddings import EmbeddingError
 from app.modules.analytics import service as analytics_service
 from app.modules.auth import repository as auth_repo
 from app.modules.cart import service as cart_service
 from app.modules.catalog import cache as _catalog_cache  # noqa: F401 — invalidation listeners
 from app.modules.media import service as media_service
+from app.modules.recommendations import service as recommendations_service
+from app.workers import dead_letter as _dead_letter  # noqa: F401 — failure signal
 from app.workers.celery_app import celery_app
 
 log = get_logger(__name__)
+
+# Retried with exponential backoff + jitter: failures that may pass on their own
+# (broker/DB/provider hiccups). Anything else — bad input, bugs — fails at once
+# and goes straight to the dead-letter list (workers/dead_letter.py).
+TRANSIENT = (
+    ConnectionError,
+    TimeoutError,
+    OSError,
+    sqlalchemy.exc.OperationalError,
+    sqlalchemy.exc.InterfaceError,
+    EmbeddingError,
+)
 
 
 def _run_with_session[T](fn: Callable[[AsyncSession], Awaitable[T]]) -> T:
@@ -56,7 +72,14 @@ def ping() -> str:
     return "pong"
 
 
-@celery_app.task(name="analytics.daily_rollup")
+@celery_app.task(
+    name="analytics.daily_rollup",
+    autoretry_for=TRANSIENT,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
 def daily_rollup() -> list[str]:
     """Persist yesterday's platform sales (UTC) to analytics_daily, plus any day
     of the past week a missed run left out. Admin analytics read these rows for
@@ -70,7 +93,14 @@ def daily_rollup() -> list[str]:
     return days
 
 
-@celery_app.task(name="maintenance.purge_expired")
+@celery_app.task(
+    name="maintenance.purge_expired",
+    autoretry_for=TRANSIENT,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
 def purge_expired() -> dict[str, int]:
     """Delete lapsed refresh tokens and carts idle past CART_RETENTION_DAYS."""
     now = datetime.now(UTC)
@@ -87,7 +117,14 @@ def purge_expired() -> dict[str, int]:
     return counts
 
 
-@celery_app.task(name="media.process_image")
+@celery_app.task(
+    name="media.process_image",
+    autoretry_for=TRANSIENT,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
 def process_image(asset_id: str) -> str:
     """Resize an upload into WebP renditions (see media/service.py)."""
     status = _run_with_session(lambda db: media_service.process_asset(db, uuid.UUID(asset_id)))
@@ -101,4 +138,41 @@ def retry_pending_media() -> int:
     count = _run_with_session(media_service.retry_pending)
     if count:
         log.info("media_retry_pending", count=count)
+    return count
+
+
+@celery_app.task(
+    name="recommendations.embed_products",
+    autoretry_for=TRANSIENT,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
+def embed_products(product_ids: list[str]) -> int:
+    """Re-embed products after they were saved (queued by recommendations.events)."""
+
+    async def work(db: AsyncSession) -> int:
+        return await recommendations_service.embed_products(db, [uuid.UUID(i) for i in product_ids])
+
+    return _run_with_session(work)
+
+
+@celery_app.task(
+    name="recommendations.refresh",
+    autoretry_for=TRANSIENT,
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=5,
+)
+def refresh_embeddings() -> int:
+    """Nightly: embed anything new or stale (text or model changed). Cheap when
+    nothing changed: unchanged products are skipped by content hash."""
+
+    async def work(db: AsyncSession) -> int:
+        return await recommendations_service.embed_products(db)
+
+    count = _run_with_session(work)
+    log.info("embeddings_refreshed", count=count)
     return count
