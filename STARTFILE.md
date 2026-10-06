@@ -213,6 +213,43 @@ The test suite drops and recreates the `_test` database every run, so never poin
 
 ---
 
+## End-to-end tests (Playwright)
+
+With the API (started with `PAYMENT_STUB_ENABLED=true`, seeded) and the web app running:
+
+```powershell
+cd apps\web
+$env:E2E_BASE_URL = "http://localhost:3000"
+$env:E2E_API_URL = "http://localhost:8000/api/v1"
+$env:E2E_CHANNEL = "msedge"          # or: npx playwright install chromium (and leave this unset)
+npx playwright test                  # report: apps\web\e2e-report\index.html
+```
+
+What the suite covers:
+
+- **Flows:** browse → bag → checkout, and vendor submits → admin approves → product is live.
+- **Accessibility and layout sweep:** axe (WCAG 2.2 AA) plus a sideways-scroll check at 375, 768, 1280 and 1920 px.
+
+The suite signs in many times from one IP, so start the API with `RATE_LIMIT_MULTIPLIER=10`.
+
+## Backups (production)
+
+- The `backup` service in `docker-compose.prod.yml` dumps the database nightly to the `postgres_backups` volume, keeping `BACKUP_KEEP_DAYS` days. Copy them off the server as well.
+- Run a backup now:
+  ```bash
+  docker compose -f docker-compose.prod.yml exec backup sh /usr/local/bin/backup-postgres.sh
+  ```
+- Restore with `scripts/restore-postgres.sh <file.dump> <target_db>`. It asks you to type the database name before it drops anything. Restore into a scratch database first.
+
+## HTTPS (production)
+
+- Set the domain in `infrastructure/nginx/conf.d/default.conf`.
+- Get the first certificate (renewals are then automatic through the `certbot` service):
+  ```bash
+  DOMAINS="example.com www.example.com" EMAIL=you@example.com sh scripts/init-letsencrypt.sh
+  ```
+- Behind Cloudflare, you can use a Cloudflare origin certificate at the same paths instead.
+
 ## New migration after changing a model
 
 ```powershell
