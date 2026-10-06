@@ -21,6 +21,8 @@ Monorepo: `apps/api` (FastAPI), `apps/web` (Next.js 16), `apps/mobile` (Flutter,
   `tests/test_permissions_audit.py` fails if a mutating /admin or /vendor route lacks either.
 - Vendor isolation: portal code takes the vendor from `CurrentVendor`/`ActiveVendor` and reads
   only through repository functions that require `vendor_id`. Foreign ids are 404, never 403.
+- Public or credential-handling write endpoints get a `limit(...)` dependency (`app/core/ratelimit.py`);
+  the client IP comes from nginx's X-Real-IP, never the first X-Forwarded-For entry.
 - Public catalog/CMS reads go through `app.core.cache.get_or_load`. Catalog writes invalidate
   automatically (`catalog/cache.py`); other namespaces call `cache.invalidate(ns)` after commit.
 - Commission is snapshotted on `vendor_orders` at checkout; never recompute past orders.
