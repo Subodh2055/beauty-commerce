@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.ratelimit import limit
 from app.modules.audit.dependencies import Audited
 from app.modules.auth.dependencies import CurrentUser, require_permission
 from app.modules.support import service
@@ -32,7 +33,12 @@ router = APIRouter()  # /support — the requester's own tickets
 admin_router = APIRouter(dependencies=[Audited])  # /admin/support
 
 
-@router.post("/tickets", response_model=TicketDetail, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/tickets",
+    response_model=TicketDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[limit("ticket_open", 10, 3600, by="user")],
+)
 async def open_ticket(body: TicketCreateIn, db: DbSession, user: CurrentUser) -> TicketDetail:
     return await service.open_ticket(db, user, body)
 
@@ -47,7 +53,11 @@ async def my_ticket(ticket_id: uuid.UUID, db: DbSession, user: CurrentUser) -> T
     return await service.get_mine(db, user.id, ticket_id)
 
 
-@router.post("/tickets/{ticket_id}/messages", response_model=TicketDetail)
+@router.post(
+    "/tickets/{ticket_id}/messages",
+    response_model=TicketDetail,
+    dependencies=[limit("ticket_reply", 60, 3600, by="user")],
+)
 async def reply(
     ticket_id: uuid.UUID, body: MessageIn, db: DbSession, user: CurrentUser
 ) -> TicketDetail:
