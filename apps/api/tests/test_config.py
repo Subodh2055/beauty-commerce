@@ -19,4 +19,6 @@ def test_production_accepts_real_secrets(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("JWT_SECRET", "x" * 48)
     monkeypatch.setenv("JWT_REFRESH_SECRET", "y" * 48)
+    # Production also requires explicit https CORS origins (no localhost default).
+    monkeypatch.setenv("CORS_ORIGINS", "https://shop.example.com")
     assert Settings(_env_file=None).is_production
