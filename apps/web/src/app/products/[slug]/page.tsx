@@ -6,7 +6,7 @@ import {
   getProduct,
   getPublicSettings,
   getRelatedProducts,
-  getSimilarScents,
+  getSimilarScored,
   type ProductDetail,
 } from "@/lib/api";
 import { formatMoney, titleCase } from "@/lib/format";
@@ -15,6 +15,7 @@ import { TruckIcon } from "@/components/ui/icons";
 import { AddToCart } from "@/components/product/add-to-cart";
 import { Accordion, AttributeTable, Ingredients, NotePyramid } from "@/components/product/attributes";
 import { Gallery } from "@/components/product/gallery";
+import { ScoredGrid } from "@/components/recommendations/scored-grid";
 import { ProductGrid } from "@/components/product/product-grid";
 import { Rating } from "@/components/product/rating";
 import { Reviews } from "@/components/product/reviews";
@@ -116,10 +117,10 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
   const isFragrance = product.product_type === "perfume" || !!product.fragrance_family;
   const [related, similar, settings] = await Promise.all([
     getRelatedProducts(slug).catch(() => []),
-    isFragrance ? getSimilarScents(slug).catch(() => []) : Promise.resolve([]),
+    isFragrance ? getSimilarScored(slug).catch(() => []) : Promise.resolve([]),
     getPublicSettings().catch(() => null),
   ]);
-  const similarSlugs = new Set(similar.map((p) => p.slug));
+  const similarSlugs = new Set(similar.map((s) => s.product.slug));
   const alsoLike = related.filter((p) => !similarSlugs.has(p.slug));
 
   return (
@@ -239,11 +240,11 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
 
       {similar.length > 0 && (
         <section className="mt-20" aria-labelledby="similar">
-          <p className="eyebrow">Shares notes with {product.name}</p>
+          <p className="eyebrow">If you like {product.name}</p>
           <h2 id="similar" className="mt-2 mb-6 font-display text-3xl font-semibold tracking-display">
             Similar scents
           </h2>
-          <ProductGrid products={similar.slice(0, 4)} priorityCount={0} />
+          <ScoredGrid items={similar.slice(0, 4)} />
         </section>
       )}
 
