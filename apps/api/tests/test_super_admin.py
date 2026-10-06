@@ -341,6 +341,7 @@ async def test_system_health_reports_every_component(api: AsyncClient, db) -> No
         "redis",
         "celery",
         "beat",
+        "dead_letter",
         "n8n",
     }
     pg = next(c for c in body["components"] if c["key"] == "postgres")
