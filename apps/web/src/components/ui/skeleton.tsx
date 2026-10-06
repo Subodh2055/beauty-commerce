@@ -46,7 +46,7 @@ export function ProductListSkeleton({ count = 5 }: { count?: number }) {
 /** Whole shop listing while results stream: sidebar, toolbar, then grid or list. */
 export function ListingSkeleton({ view = "grid" }: { view?: "grid" | "list" }) {
   return (
-    <div className="grid gap-8 lg:grid-cols-[248px_1fr]" aria-busy aria-label="Loading products">
+    <div className="grid gap-8 lg:grid-cols-[248px_1fr]" role="status" aria-busy aria-label="Loading products">
       <div className="hidden space-y-7 lg:block">
         {[5, 4, 6].map((rows, g) => (
           <div key={g} className="space-y-2.5">
