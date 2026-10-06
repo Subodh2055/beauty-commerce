@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { ChevronIcon, EditIcon } from "@/components/ui/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ForYou } from "@/components/recommendations/for-you";
 
 export default function AccountPage() {
   return (
@@ -97,6 +98,8 @@ function Overview() {
           </ul>
         )}
       </section>
+
+      <ForYou />
 
       <section className="flex flex-col gap-3 rounded-panel border border-border bg-surface-2 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
