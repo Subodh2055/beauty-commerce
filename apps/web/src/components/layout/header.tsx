@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { useMotionValueEvent, useScroll } from "motion/react";
 import { useStore } from "@/lib/store";
 import { openCart } from "@/lib/cart-ui";
@@ -17,6 +17,7 @@ import {
   UserIcon,
 } from "@/components/ui/icons";
 import { MobileNav } from "./mobile-nav";
+import { SemanticSearch } from "@/components/recommendations/semantic-search";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface Props {
@@ -27,9 +28,7 @@ export function Header({ categories }: Props) {
   const { cartCount, wishlist, hydrated } = useStore();
   const { user } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
   const [scrolled, setScrolled] = useState(false);
   const { scrollY } = useScroll();
   useMotionValueEvent(scrollY, "change", (y) => setScrolled(y > 24));
@@ -38,12 +37,6 @@ export function Header({ categories }: Props) {
   const glass = scrolled || !isHome;
 
   const isAdmin = checkAdmin(user);
-
-  function onSearch(e: FormEvent) {
-    e.preventDefault();
-    const term = q.trim();
-    router.push(term ? `/search?q=${encodeURIComponent(term)}` : "/products");
-  }
 
   const isActive = (href: string) =>
     href === "/products" ? pathname === href : pathname.startsWith(href);
@@ -110,6 +103,9 @@ export function Header({ categories }: Props) {
             <NavLink href="/brands" active={isActive("/brands")}>
               Brands
             </NavLink>
+            <NavLink href="/find-your-scent" active={isActive("/find-your-scent")}>
+              Find your scent
+            </NavLink>
             {isAdmin && (
               <NavLink href="/admin" active={isActive("/admin")}>
                 Admin
@@ -122,19 +118,7 @@ export function Header({ categories }: Props) {
             )}
           </nav>
 
-          <form onSubmit={onSearch} role="search" className="ml-auto hidden max-w-xs flex-1 md:block">
-            <label className="relative block">
-              <span className="sr-only">Search products</span>
-              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
-              <input
-                type="search"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search perfumes, serums…"
-                className="focus-ring h-10 w-full rounded-full border border-border-strong bg-surface pl-10 pr-4 text-sm placeholder:text-muted"
-              />
-            </label>
-          </form>
+          <SemanticSearch className="ml-auto hidden max-w-xs flex-1 md:block" />
 
           <div className="ml-auto flex items-center gap-0.5 md:ml-0 sm:gap-1">
             <Link
