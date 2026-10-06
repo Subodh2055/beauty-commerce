@@ -156,13 +156,16 @@ services:
       - ../nginx/conf.d:/etc/nginx/conf.d:ro
       - ../nginx/snippets:/etc/nginx/snippets:ro
       - certbot_certs:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    # Reload every 6h so renewed certificates are picked up without downtime.
+    command: ["/bin/sh", "-c", "while :; do sleep 6h & wait $${!}; nginx -s reload; done & exec nginx -g 'daemon off;'"]
     depends_on:
       api:
         condition: service_healthy
       web:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1/api/v1/health"]
+      test: ["CMD-SHELL", "wget -qO /dev/null --no-check-certificate https://127.0.0.1/api/v1/health"]
       interval: 15s
       timeout: 5s
       retries: 3
