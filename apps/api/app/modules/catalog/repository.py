@@ -40,6 +40,10 @@ def _published(stmt: Select) -> Select:
     )
 
 
+# Public name for other modules (recommendations) that must apply the same rule.
+published = _published
+
+
 async def category_ids_in_subtree(db: AsyncSession, slug: str) -> list[uuid.UUID] | None:
     """Return the category and all descendants, or None if the slug doesn't exist."""
     root = await db.scalar(select(Category).where(Category.slug == slug, Category.is_active))
