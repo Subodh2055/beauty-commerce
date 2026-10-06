@@ -285,6 +285,62 @@ export const getSimilarScents = (slug: string) =>
     next: { revalidate: CATALOG_REVALIDATE, tags: ["products"] },
   });
 
+// --- recommendations (apps/api/app/modules/recommendations) ---------------------
+
+/** A product with how well it fits (0–100) and why, most important reason first. */
+export interface ScoredProduct {
+  product: ProductSummary;
+  match: number;
+  reasons: string[];
+}
+
+export interface SemanticResults {
+  query: string;
+  /** keyword: embeddings unavailable, plain text match used (match is 0). */
+  mode: "semantic" | "keyword";
+  results: ScoredProduct[];
+}
+
+export type QuizMood = "fresh" | "romantic" | "cozy" | "bold" | "clean" | "mysterious";
+export type QuizOccasion = "everyday" | "office" | "date" | "evening" | "special";
+export type QuizSeason = "spring" | "summer" | "autumn" | "winter" | "all";
+
+export interface QuizAnswers {
+  mood: QuizMood;
+  occasion: QuizOccasion;
+  season: QuizSeason;
+  liked_notes: string[];
+  disliked_notes: string[];
+}
+
+export interface QuizResults {
+  summary: string;
+  results: ScoredProduct[];
+}
+
+export interface ForYou {
+  basis: "history" | "popular";
+  results: ScoredProduct[];
+}
+
+/** Search by meaning. Short-lived cache: the same query is cheap server-side too. */
+export const semanticSearch = (q: string, limit = 12, init: RequestInit = {}) =>
+  api<SemanticResults>("/recommendations/search", {
+    ...init,
+    query: { q, limit },
+    next: { revalidate: CATALOG_REVALIDATE, tags: ["products"] },
+  });
+
+/** Similar scents with match % and reasons (embedding neighbours + shared notes). */
+export const getSimilarScored = (slug: string, limit = 8) =>
+  api<ScoredProduct[]>(`/recommendations/similar/${encodeURIComponent(slug)}`, {
+    query: { limit },
+    next: { revalidate: CATALOG_REVALIDATE, tags: ["products"] },
+  });
+
+export const submitQuiz = (answers: QuizAnswers) =>
+  api<QuizResults>("/recommendations/quiz", { method: "POST", body: JSON.stringify(answers) });
+
 export interface PublicSettings {
   free_shipping_threshold: string;
   shipping_fee: string;
