@@ -20,18 +20,15 @@ async def grant(email: str, role_name: str) -> None:
     role_name = role_name.upper()
     valid = {r.value for r in RoleEnum}
     if role_name not in valid:
-        print(f"Invalid role '{role_name}'. Choose from: {', '.join(sorted(valid))}")
-        return
+        raise SystemExit(f"Invalid role '{role_name}'. Choose from: {', '.join(sorted(valid))}")
 
     async with SessionLocal() as db:
         user = await db.scalar(select(User).where(User.email == email.lower()))
         if user is None:
-            print(f"No user with email {email!r}. Register first.")
-            return
+            raise SystemExit(f"No user with email {email!r}. Register first.")
         role = await db.scalar(select(Role).where(Role.name == role_name))
         if role is None:
-            print(f"Role {role_name} not found; run migrations first.")
-            return
+            raise SystemExit(f"Role {role_name} not found; run migrations first.")
         if any(r.name == role_name for r in user.roles):
             print(f"{email} already has role {role_name}.")
             return
