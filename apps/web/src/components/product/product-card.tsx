@@ -21,8 +21,12 @@ export function ProductCard({
 
   return (
     <article className="group relative flex flex-col">
+      {/* Pointer target only: the title link below stretches over the whole card
+          and is the one link keyboard and screen-reader users get. */}
       <Link
         href={href}
+        tabIndex={-1}
+        aria-hidden
         className="focus-ring relative block aspect-[4/5] overflow-hidden rounded-card bg-surface-2 shadow-soft transition-all duration-(--duration-base) ease-standard group-hover:-translate-y-1.5 group-hover:shadow-lift"
       >
         {img ? (
@@ -49,7 +53,7 @@ export function ProductCard({
       </Link>
 
       <WishlistButton
-        className="absolute right-3 top-3 h-9 w-9 bg-surface/90 shadow-hairline backdrop-blur"
+        className="absolute right-3 top-3 z-10 h-9 w-9 bg-surface/90 shadow-hairline backdrop-blur"
         item={{
           productId: product.id,
           slug: product.slug,
