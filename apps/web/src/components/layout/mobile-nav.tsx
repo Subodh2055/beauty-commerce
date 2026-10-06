@@ -147,6 +147,7 @@ export function MobileNav({ open, onClose, categories, isAdmin }: Props) {
           )}
 
           <DrawerLink onClick={() => go("/brands")}>Brands</DrawerLink>
+          <DrawerLink onClick={() => go("/find-your-scent")}>Find your scent</DrawerLink>
           {isAdmin && <DrawerLink onClick={() => go("/admin")}>Admin</DrawerLink>}
           <div className="mt-2 flex items-center justify-between rounded-control px-3 py-1 text-base">
             Appearance
