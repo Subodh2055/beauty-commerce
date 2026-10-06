@@ -96,7 +96,7 @@ function Report({ range }: { range: DateRange }) {
             />
           </Card>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-2">
             <RankedTable title="Top products" rows={data.top_products} money={money} kind="product" />
             <RankedTable title="Top vendors" rows={data.top_vendors} money={money} kind="vendor" />
             <StatusBreakdown data={data} money={money} />
@@ -140,7 +140,8 @@ function RankedTable({
       {rows.length === 0 ? (
         <p className="text-sm text-muted">Nothing sold in this range.</p>
       ) : (
-        <div className="overflow-x-auto">
+        // Focusable so keyboard users can scroll it sideways on narrow screens.
+        <div className="focus-ring overflow-x-auto rounded-sm" tabIndex={0} role="region" aria-label={title}>
           <table className="w-full text-sm">
             <caption className="sr-only">{title}</caption>
             <thead>
@@ -220,7 +221,7 @@ function BarList({ rows }: { rows: { label: string; value: number; detail: strin
 
 function ReportSkeleton() {
   return (
-    <div className="space-y-6" aria-busy aria-label="Loading analytics">
+    <div className="space-y-6" role="status" aria-busy aria-label="Loading analytics">
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={i} className="h-28" />
