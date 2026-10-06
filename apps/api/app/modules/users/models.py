@@ -1,7 +1,16 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String, Table, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    String,
+    Table,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -36,6 +45,11 @@ role_permissions = Table(
 )
 
 
+# Reverse lookups ("who holds this role / which roles grant this permission").
+Index("ix_user_roles_role_id", user_roles.c.role_id)
+Index("ix_role_permissions_permission_id", role_permissions.c.permission_id)
+
+
 class Permission(UUIDMixin, Base):
     __tablename__ = "permissions"
 
@@ -58,6 +72,7 @@ class Role(UUIDMixin, Base):
 
 class User(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (Index("ix_users_created_at", "created_at"),)
 
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str | None] = mapped_column(String(255))
