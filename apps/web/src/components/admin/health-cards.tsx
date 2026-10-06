@@ -20,6 +20,8 @@ const DETAIL_LABELS: Record<string, string> = {
   url: "URL",
   error_rate: "5xx rate",
   requests_5m: "Requests (5 min)",
+  count: "Failed tasks",
+  latest_error: "Latest error",
 };
 
 /** One card per dependency: status in words + icon, latency, details. */
