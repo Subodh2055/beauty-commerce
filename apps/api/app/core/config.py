@@ -135,6 +135,11 @@ class Settings(BaseSettings):
             raise ValueError("JWT_SECRET and JWT_REFRESH_SECRET must be set in production")
         if self.app_env == "production" and self.payment_stub_enabled:
             raise ValueError("PAYMENT_STUB_ENABLED must be off in production")
+        if self.app_env == "production":
+            # Credentials are allowed cross-origin, so origins must be explicit HTTPS.
+            bad = [o for o in self.cors_origins if o == "*" or not o.startswith("https://")]
+            if bad:
+                raise ValueError(f"CORS_ORIGINS must list https:// origins in production: {bad}")
         return self
 
     @property
