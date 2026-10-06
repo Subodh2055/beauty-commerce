@@ -15,6 +15,7 @@ Security notes:
   SMTP is configured (Phase 8). The tokens themselves are real and enforced.
 """
 
+import hashlib
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -149,14 +150,20 @@ async def register(
     return AuthResult(user=to_user_out(user), tokens=tokens)
 
 
+_DUMMY_HASH = hash_password("timing-equaliser-not-a-real-password")
+
+
+def _password_fingerprint(hashed: str | None) -> str:
+    return hashlib.sha256((hashed or "").encode()).hexdigest()[:16]
+
+
 async def login(db: AsyncSession, email: str, password: str, meta: RequestMeta) -> AuthResult:
     user = await repo.get_user_by_email(db, email.lower())
-    # Constant-ish work whether or not the user exists, and one generic error.
-    if (
-        user is None
-        or not user.hashed_password
-        or not verify_password(password, user.hashed_password)
-    ):
+    # Same work whether or not the account exists: verify against a dummy hash
+    # for unknown emails so response time doesn't reveal who is registered.
+    hashed = user.hashed_password if user is not None and user.hashed_password else _DUMMY_HASH
+    ok = verify_password(password, hashed)
+    if user is None or not user.hashed_password or not ok:
         raise UnauthorizedError("Incorrect email or password")
     if not user.is_active:
         raise UnauthorizedError("This account is disabled")
@@ -235,16 +242,28 @@ async def logout(db: AsyncSession, refresh_token: str) -> None:
 async def request_password_reset(db: AsyncSession, email: str) -> None:
     user = await repo.get_user_by_email(db, email.lower())
     if user is not None:
-        token = create_purpose_token(str(user.id), "password_reset", expire_minutes=30)
-        log.info("password_reset_link", user_id=str(user.id), token=token)
+        token = create_purpose_token(
+            str(user.id),
+            "password_reset",
+            expire_minutes=30,
+            extra={"pwf": _password_fingerprint(user.hashed_password)},
+        )
+        # Email delivery isn't wired yet; outside production the link is logged
+        # so it can be used locally. Never log reset tokens in production.
+        if settings.is_production:
+            log.info("password_reset_requested", user_id=str(user.id))
+        else:
+            log.info("password_reset_link", user_id=str(user.id), token=token)
     # Always succeed to avoid leaking which emails are registered.
 
 
 async def confirm_password_reset(db: AsyncSession, token: str, new_password: str) -> None:
     payload = decode_purpose_token(token, "password_reset")
     user = await repo.get_user_by_id(db, payload["sub"])
-    if user is None:
-        raise UnauthorizedError("Invalid link")
+    # Single use: the token carries a fingerprint of the password it may replace,
+    # so once the password changes (by this link or otherwise) it stops working.
+    if user is None or payload.get("pwf") != _password_fingerprint(user.hashed_password):
+        raise UnauthorizedError("This link has already been used or is no longer valid")
     user.hashed_password = hash_password(new_password)
     await repo.revoke_all_for_user(db, user.id)  # force re-login everywhere
     await db.commit()
