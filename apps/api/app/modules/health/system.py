@@ -6,6 +6,7 @@ dead dependency shows up red on the page rather than taking the page down.
 """
 
 import asyncio
+import json
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
@@ -33,6 +34,7 @@ PROBE_TIMEOUT = 2.0
 # The DB probe sizes the database, which can take a moment on a cold cache.
 DB_TIMEOUT = 5.0
 BEAT_HEARTBEAT_KEY = "system:beat:last_ping"  # written by workers.tasks.ping
+DEAD_LETTER_KEY = "celery:dead_letter"  # written by workers.dead_letter
 _RANK = {"ok": 0, "unknown": 1, "degraded": 2, "down": 3}
 
 
@@ -258,6 +260,35 @@ async def _beat(client: aioredis.Redis | None) -> Component:
     )
 
 
+async def _dead_letters(client: aioredis.Redis | None) -> Component:
+    """Tasks that failed after all retries (workers.dead_letter)."""
+    if client is None:
+        return Component(
+            key="dead_letter", name="Failed tasks", status="unknown", summary="Redis is down"
+        )
+    try:
+        count = await asyncio.wait_for(client.llen(DEAD_LETTER_KEY), PROBE_TIMEOUT)
+        latest = await asyncio.wait_for(client.lindex(DEAD_LETTER_KEY, 0), PROBE_TIMEOUT)
+    except Exception as exc:  # noqa: BLE001
+        return Component(
+            key="dead_letter",
+            name="Failed tasks",
+            status="unknown",
+            summary="Unknown",
+            error=str(exc),
+        )
+    if not count:
+        return Component(key="dead_letter", name="Failed tasks", status="ok", summary="None")
+    last = json.loads(latest) if latest else {}
+    return Component(
+        key="dead_letter",
+        name="Failed tasks",
+        status="degraded",
+        summary=f"{count} failed after retries · latest: {last.get('task', '?')}",
+        details={"count": count, "latest_error": str(last.get("error", ""))[:200]},
+    )
+
+
 async def _n8n() -> Component:
     if not settings.n8n_webhook_url:
         return Component(
@@ -295,6 +326,7 @@ async def system_health(db: AsyncSession) -> SystemHealth:
     )
     try:
         beat = await _beat(client)
+        dead = await _dead_letters(client)
     finally:
         if client is not None:
             await client.aclose()
@@ -309,7 +341,7 @@ async def system_health(db: AsyncSession) -> SystemHealth:
         summary=f"p95 {snap['p95_ms']} ms · {snap['per_minute']} req/min",
         details={"error_rate": snap["error_rate"], "requests_5m": snap["requests"]},
     )
-    components = [api, postgres, redis_c, celery_c, beat, n8n]
+    components = [api, postgres, redis_c, celery_c, beat, dead, n8n]
     worst = max(components, key=lambda c: _RANK[c.status]).status
     return SystemHealth(
         status="ok" if worst == "unknown" else worst,
