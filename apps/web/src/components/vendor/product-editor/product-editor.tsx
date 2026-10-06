@@ -328,7 +328,7 @@ export function ProductEditor({ product: initial }: { product?: VendorProductDet
           )}
 
           <Section title="Search engine listing" description="How the product appears in Google and link previews.">
-            <div className="rounded-card border border-border bg-surface-2 p-4" aria-label="Search result preview">
+            <div className="rounded-card border border-border bg-surface-2 p-4" role="group" aria-label="Search result preview">
               <p className="truncate text-xs text-muted">
                 beauty.com.np › products › {slug || "your-product"}
               </p>
