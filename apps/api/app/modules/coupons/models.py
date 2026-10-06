@@ -48,7 +48,7 @@ class CouponUsage(UUIDMixin, Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True
     )
     order_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL")
+        UUID(as_uuid=True), ForeignKey("orders.id", ondelete="SET NULL"), index=True
     )
     discount_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
