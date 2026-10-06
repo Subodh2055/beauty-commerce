@@ -12,7 +12,6 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
@@ -23,17 +22,12 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
-    func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base, TimestampMixin, UUIDMixin
 from app.shared.enums import ProductStatus
-
-# Width of product embeddings (voyage-3.5 / voyage-3-large default). Changing it
-# needs a migration that rebuilds product_embeddings.
-EMBEDDING_DIM = 1024
 
 
 class Category(UUIDMixin, TimestampMixin, Base):
@@ -256,22 +250,3 @@ class ProductImage(UUIDMixin, Base):
     is_primary: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     product: Mapped[Product] = relationship(back_populates="images")
-
-
-class ProductEmbedding(Base):
-    """Semantic-search vector for a product, kept out of `products` so ordinary
-    catalog queries never load it. Needs the pgvector extension (the Docker image
-    has it); migration 0018 skips the table when the extension is missing."""
-
-    __tablename__ = "product_embeddings"
-
-    product_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("products.id", ondelete="CASCADE"), primary_key=True
-    )
-    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIM), nullable=False)
-    model: Mapped[str] = mapped_column(String(100), nullable=False)
-    # Hash of the text that was embedded; re-embed only when it changes.
-    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
-    )
