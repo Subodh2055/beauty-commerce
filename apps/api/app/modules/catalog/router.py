@@ -54,10 +54,13 @@ async def related_products(db: DbSession, slug: str) -> list[ProductSummary]:
 @products_router.get(
     "/{slug}/similar",
     response_model=list[ProductSummary],
-    summary="Similar scents (shared notes, same family)",
+    summary="Similar scents (embedding neighbours + shared notes)",
 )
 async def similar_scents(db: DbSession, slug: str) -> list[ProductSummary]:
-    return await service.similar_scents(db, slug)
+    # Same ranking as /recommendations/similar/{slug}, without the match scores.
+    from app.modules.recommendations import service as recommendations
+
+    return [s.product for s in await recommendations.similar(db, slug)]
 
 
 @categories_router.get("", response_model=list[CategoryTree], summary="Category tree")
