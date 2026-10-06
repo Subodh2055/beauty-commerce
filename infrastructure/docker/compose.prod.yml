@@ -112,7 +112,7 @@ services:
         condition: service_healthy
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.41.7  # pinned; bump deliberately after reading the changelog
     restart: always
     environment:
       N8N_HOST: ${N8N_HOST:-n8n.example.com}
