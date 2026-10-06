@@ -124,6 +124,51 @@ The web app calls the API at `NEXT_PUBLIC_API_URL` (default `http://localhost:80
 
 ---
 
+## pgvector is required
+
+The database must have the **pgvector** extension. The Docker image (`pgvector/pgvector:pg16`) already includes it.
+
+On a plain Windows PostgreSQL, `alembic upgrade head` stops with:
+
+```
+pgvector is required but not installed on this PostgreSQL server.
+```
+
+Ways to fix that:
+
+- **Use Docker** for Postgres (Option A or B). This is the easiest.
+- **Install pgvector into your PostgreSQL.** Prebuilt Windows binaries exist for some versions, or you can build it with Visual Studio
+  (see https://github.com/pgvector/pgvector#windows).
+- **Run a separate PostgreSQL 16 that already has pgvector**, from conda-forge (no admin rights needed):
+  ```powershell
+  # micromamba: https://mamba.readthedocs.io (single exe)
+  micromamba create -y -p C:\pg16 -c conda-forge postgresql=16 pgvector
+  C:\pg16\Libraryin\initdb.exe -D C:\pg16data -U beauty -A trust -E UTF8
+  C:\pg16\Libraryin\pg_ctl.exe -D C:\pg16data -o "-p 26432" -l C:\pg16data\log.txt start
+  C:\pg16\Libraryin\createdb.exe -h localhost -p 26432 -U beauty beauty_commerce
+  ```
+  Then set `DATABASE_URL=postgresql+asyncpg://beauty@localhost:26432/beauty_commerce` in `.env`.
+
+## Embeddings (search by meaning, similar scents, the scent quiz)
+
+```powershell
+cd appspi
+.\.venv\Scripts\python.exe -m app.scripts.embed_products            # embed new or changed products
+.\.venv\Scripts\python.exe -m app.scripts.embed_products --status   # coverage
+.\.venv\Scripts\python.exe -m app.scripts.embed_products --force    # everything (after switching provider)
+```
+
+- Run the first command once after seeding.
+- After that, saving a product queues a re-embed through the Celery worker, and beat refreshes anything stale nightly at 01:00 UTC.
+- If you aren't running Celery, re-run the first command whenever you like; unchanged products are skipped.
+
+Provider settings in `.env`:
+
+- `EMBEDDING_PROVIDER=local` is offline and needs no key.
+- `voyage` or `openai` need `EMBEDDING_API_KEY` and give much better matches.
+
+---
+
 ## Make yourself an admin
 
 Register on the site (http://localhost:3000/register), then grant a role:
