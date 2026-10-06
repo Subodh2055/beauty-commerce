@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,6 +19,10 @@ from app.shared.enums import OrderStatus, PaymentMethod, PaymentStatus, VendorOr
 
 class Order(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "orders"
+    __table_args__ = (
+        Index("ix_orders_status_created_at", "status", "created_at"),
+        Index("ix_orders_created_at", "created_at"),
+    )
 
     order_number: Mapped[str] = mapped_column(String(20), unique=True, index=True, nullable=False)
     # Nullable: deleting a user keeps their orders (FK is SET NULL).
@@ -132,10 +136,10 @@ class OrderItem(UUIDMixin, Base):
         UUID(as_uuid=True), ForeignKey("vendor_orders.id", ondelete="CASCADE"), index=True
     )
     product_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL")
+        UUID(as_uuid=True), ForeignKey("products.id", ondelete="SET NULL"), index=True
     )
     variant_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="SET NULL")
+        UUID(as_uuid=True), ForeignKey("product_variants.id", ondelete="SET NULL"), index=True
     )
     product_name: Mapped[str] = mapped_column(String(255), nullable=False)
     variant_name: Mapped[str] = mapped_column(String(120), nullable=False)
