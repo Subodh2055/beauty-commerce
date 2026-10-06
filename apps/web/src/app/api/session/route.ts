@@ -17,7 +17,20 @@ export const COOKIE_NAME = "bc_at";
 /** Matches ACCESS_TOKEN_EXPIRE_MINUTES on the API, plus a little slack. */
 const MAX_AGE_SECONDS = 6 * 60;
 
+/** Only our own pages may set or clear the cookie: refuse cross-site requests. */
+function sameOrigin(request: Request): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return request.headers.get("sec-fetch-site") !== "cross-site";
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   let token: unknown;
   try {
     token = ((await request.json()) as { access_token?: unknown }).access_token;
@@ -41,7 +54,8 @@ export async function POST(request: Request) {
   return res;
 }
 
-export async function DELETE() {
+export async function DELETE(request: Request) {
+  if (!sameOrigin(request)) return NextResponse.json({ ok: false }, { status: 403 });
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIE_NAME, "", {
     httpOnly: true,
