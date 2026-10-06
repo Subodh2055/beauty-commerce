@@ -41,3 +41,8 @@ apps/api/uploads/
 .DS_Store
 Thumbs.db
 *.log
+
+# Playwright
+apps/web/test-results/
+apps/web/e2e-report/
+apps/web/playwright/.cache/
