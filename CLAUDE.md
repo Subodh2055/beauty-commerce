@@ -53,6 +53,8 @@ Monorepo: `apps/api` (FastAPI), `apps/web` (Next.js 16), `apps/mobile` (Flutter,
   (`/api/session`). Shared routing/cache rules live in `infrastructure/nginx/snippets/`; edit there, not per env.
 - Beat schedule is in `app/workers/celery_app.py`; tasks in `app/workers/tasks.py` call module services and
   use `_run_with_session` (NullPool engine per call). Exactly one beat container per deployment.
+- pgvector is required (migration 0029). Embeddings live in `modules/recommendations`; the provider is
+  chosen by `EMBEDDING_PROVIDER` (`app/integrations/embeddings.py`); tests use the offline `local` provider.
 - Healthchecks are defined in compose, not the API Dockerfile (the same image runs worker and beat).
 
 ## Environment
