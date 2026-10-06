@@ -22,7 +22,7 @@ from app.modules.admin.schemas import (
     VariantStockOut,
 )
 from app.modules.audit.dependencies import Audited
-from app.modules.auth.dependencies import require_permission
+from app.modules.auth.dependencies import require_any_permission, require_permission
 from app.modules.catalog import service as catalog_service
 from app.modules.catalog.schemas import (
     FamilyWriteIn,
@@ -311,6 +311,20 @@ async def list_notifications(db: DbSession, _: Dashboard, page: Paging) -> Page[
     response_model=MediaAssetOut,
     status_code=status.HTTP_201_CREATED,
     summary="Upload an image (resized to WebP in the background)",
+    # media.upload alone isn't enough: vendors hold it for /vendor/uploads.
+    # Platform-owned media is for staff who edit the catalog or content.
+    dependencies=[
+        Depends(
+            require_any_permission(
+                Permission.PRODUCTS_CREATE,
+                Permission.PRODUCTS_EDIT,
+                Permission.TAXONOMY_CREATE,
+                Permission.TAXONOMY_EDIT,
+                Permission.CMS_CREATE,
+                Permission.CMS_EDIT,
+            )
+        )
+    ],
 )
 async def upload_image(
     db: DbSession, user: Uploader, file: Annotated[UploadFile, File()]
