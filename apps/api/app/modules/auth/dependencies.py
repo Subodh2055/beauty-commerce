@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenError, SessionExpiredError, UnauthorizedError
+from app.core.ratelimit import client_ip
 from app.core.security import decode_token
 from app.modules.auth import repository as repo
 from app.modules.users.models import User
@@ -23,11 +24,9 @@ BearerCreds = Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)]
 
 
 def request_meta(request: Request) -> tuple[str | None, str | None]:
-    ua = request.headers.get("user-agent")
-    ip = request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (
-        request.client.host if request.client else None
-    )
-    return ua, ip
+    # X-Real-IP is set by our nginx from the connection; the first
+    # X-Forwarded-For entry is whatever the client claimed, so it isn't used.
+    return request.headers.get("user-agent"), client_ip(request)
 
 
 RequestMeta = Annotated[tuple[str | None, str | None], Depends(request_meta)]
@@ -107,6 +106,18 @@ def require_permission(code: str) -> Callable[[User], Coroutine[Any, Any, User]]
 
     # Lets tests and docs introspect which permission a route needs.
     checker.required_permission = code  # type: ignore[attr-defined]
+    return checker
+
+
+def require_any_permission(*codes: str) -> Callable[[User], Coroutine[Any, Any, User]]:
+    """Like require_permission, satisfied by any one of `codes`."""
+
+    async def checker(user: CurrentUser) -> User:
+        if not any(user.has_permission(c) for c in codes):
+            raise ForbiddenError("You do not have permission to do this")
+        return user
+
+    checker.required_permission = codes  # type: ignore[attr-defined]
     return checker
 
 
