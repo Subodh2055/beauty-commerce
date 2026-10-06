@@ -75,6 +75,22 @@ class Settings(BaseSettings):
     media_base_url: str = ""
     max_upload_mb: int = 5
 
+    # Embeddings (semantic search, similar scents, recommendations). Provider:
+    #   local  — offline feature-hashing model; no key, lexical-quality only (dev default)
+    #   voyage — Voyage AI (voyage-3.5, 1024 dims)
+    #   openai — OpenAI-compatible /embeddings (text-embedding-3-small at 1024 dims)
+    # Vectors are stored at EMBEDDING_DIM (1024); switching provider or model
+    # re-embeds everything on the next refresh (each row records its model).
+    embedding_provider: Literal["local", "voyage", "openai"] = "local"
+    embedding_model: str = ""  # empty → the provider's default
+    embedding_api_key: str = ""
+    embedding_base_url: str = ""  # empty → the provider's public endpoint
+    embedding_timeout_seconds: float = 20.0
+    # Queue a re-embed on every product write (tests turn this off and embed inline).
+    embedding_enqueue_on_write: bool = True
+    # Query embeddings are cached in Redis this long (same text → same vector).
+    embedding_query_cache_seconds: int = 30 * 24 * 3600
+
     # n8n
     n8n_base_url: str = "http://localhost:5678"
     n8n_webhook_secret: str = ""
