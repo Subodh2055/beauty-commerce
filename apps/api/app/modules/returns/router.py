@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.ratelimit import limit
 from app.modules.audit.dependencies import Audited
 from app.modules.auth.dependencies import CurrentUser, require_permission
 from app.modules.returns import service
@@ -42,6 +43,7 @@ ReturnsEdit = Annotated[User, Depends(require_permission(Permission.RETURNS_EDIT
     response_model=ReturnOut,
     status_code=status.HTTP_201_CREATED,
     summary="Ask to return items from a delivered order",
+    dependencies=[limit("return_request", 10, 3600, by="user")],
 )
 async def request_return(
     order_id: uuid.UUID, body: ReturnCreateIn, db: DbSession, user: CurrentUser
