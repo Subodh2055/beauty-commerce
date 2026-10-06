@@ -75,9 +75,12 @@ def decode_token(token: str, expected_type: TokenType) -> dict[str, Any]:
 # Signed with JWT_SECRET and carry a `purpose` claim. Short-lived.
 
 
-def create_purpose_token(subject: str, purpose: str, expire_minutes: int = 30) -> str:
+def create_purpose_token(
+    subject: str, purpose: str, expire_minutes: int = 30, extra: dict[str, Any] | None = None
+) -> str:
     now = datetime.now(UTC)
     payload = {
+        **(extra or {}),
         "sub": subject,
         "type": "purpose",
         "purpose": purpose,
