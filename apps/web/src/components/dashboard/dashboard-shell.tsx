@@ -54,7 +54,7 @@ export function DashboardShell({
 
   if (!ready) {
     return (
-      <div className="container-x py-10" aria-busy aria-label="Loading dashboard">
+      <div className="container-x py-10" role="status" aria-busy aria-label="Loading dashboard">
         <Skeleton className="mb-8 h-8 w-48" />
         <div className="grid gap-8 lg:grid-cols-[200px_1fr]">
           <Skeleton className="hidden h-72 lg:block" />
