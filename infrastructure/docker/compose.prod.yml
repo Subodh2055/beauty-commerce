@@ -42,6 +42,7 @@ services:
   migrate:
     build:
       context: ../../apps/api
+      target: prod
     <<: *api-env
     command: alembic upgrade head
     depends_on:
@@ -51,6 +52,7 @@ services:
   api:
     build:
       context: ../../apps/api
+      target: prod
     <<: *api-env
     restart: always
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips="*"
@@ -77,6 +79,7 @@ services:
   worker:
     build:
       context: ../../apps/api
+      target: prod
     <<: *api-env
     restart: always
     command: celery -A app.workers.celery_app worker --loglevel=info --concurrency=2
@@ -97,6 +100,7 @@ services:
   beat:
     build:
       context: ../../apps/api
+      target: prod
     <<: *api-env
     restart: always
     # Exactly one beat per deployment, or scheduled jobs run twice. Never scale this.
