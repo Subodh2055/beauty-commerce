@@ -44,6 +44,9 @@ Monorepo: `apps/api` (FastAPI), `apps/web` (Next.js 16), `apps/mobile` (Flutter,
 - Host-side equivalents: seed `cd apps/api && python -m app.scripts.seed_catalog` (idempotent), tests `pytest`,
   lint `ruff check . && ruff format --check .`, migration `alembic revision --autogenerate -m "..."`
 - Web: `cd apps/web && npm run dev` / `npm run build` / `npm run lint`
+- E2E (Playwright, against a running stack with PAYMENT_STUB_ENABLED=true): `cd apps/web && npx playwright test`;
+  env E2E_BASE_URL / E2E_API_URL, E2E_CHANNEL=msedge to use the installed browser. Includes an axe +
+  sideways-scroll sweep at 375/768/1280/1920.
 
 ## Infra notes
 - nginx routes only `/api/v1/*` (+ `/uploads/*`) to FastAPI. Other `/api/*` paths are Next route handlers
