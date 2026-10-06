@@ -31,6 +31,7 @@ from app.modules.newsletter.router import router as newsletter_router
 from app.modules.orders.router import router as orders_router
 from app.modules.payments.router import router as payments_router
 from app.modules.payouts.router import router as payouts_admin_router
+from app.modules.recommendations.router import router as recommendations_router
 from app.modules.returns.router import admin_router as returns_admin_router
 from app.modules.returns.router import mine_router as my_returns_router
 from app.modules.returns.router import router as returns_router
@@ -73,6 +74,9 @@ api_router.include_router(support_router, prefix="/support", tags=["support"])
 api_router.include_router(settings_router, prefix="/settings", tags=["settings"])
 api_router.include_router(media_router, prefix="/media", tags=["media"])
 api_router.include_router(newsletter_router, prefix="/newsletter", tags=["newsletter"])
+api_router.include_router(
+    recommendations_router, prefix="/recommendations", tags=["recommendations"]
+)
 
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
 api_router.include_router(vendors_admin_router, prefix="/admin/vendors", tags=["admin"])
