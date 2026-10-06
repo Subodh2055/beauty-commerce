@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.ratelimit import limit
 from app.modules.auth.dependencies import CurrentUser
 from app.modules.orders import service
 from app.modules.orders.schemas import CheckoutIn, CheckoutResult, OrderDetail, OrderSummary
@@ -16,7 +17,12 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 Paging = Annotated[PageParams, Depends(page_params)]
 
 
-@router.post("", response_model=CheckoutResult, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CheckoutResult,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[limit("checkout", 20, 600, by="user")],
+)
 async def checkout(body: CheckoutIn, db: DbSession, user: CurrentUser) -> CheckoutResult:
     return await service.checkout(db, user.id, user.email, body)
 
