@@ -14,7 +14,6 @@ from app.modules.catalog.models import (
     FragranceFamily,
     FragranceNote,
     Product,
-    ProductEmbedding,
     ProductImage,
     ProductNote,
     ProductVariant,
@@ -28,6 +27,7 @@ from app.modules.notifications.models import Notification
 from app.modules.orders.models import Order, OrderItem, OrderStatusHistory, Payment, VendorOrder
 from app.modules.payments.models import PaymentEvent
 from app.modules.payouts.models import Payout
+from app.modules.recommendations.models import ProductEmbedding
 from app.modules.returns.models import Refund, ReturnRequest
 from app.modules.reviews.models import Review
 from app.modules.settings.models import PlatformSetting
