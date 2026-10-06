@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     # flowing. 0 disables it (the page then reports beat as "not monitored").
     beat_heartbeat_seconds: int = 60
 
+    # Rate limits (app/core/ratelimit.py). The multiplier scales every rule, e.g.
+    # for load tests; nginx adds a coarse per-IP limit in front.
+    rate_limit_enabled: bool = True
+    rate_limit_multiplier: int = 1
+
     # Auth
     # Dev-only defaults; ≥32 bytes so HS256 doesn't warn. Must be overridden in production.
     jwt_secret: str = "dev-only-access-secret-change-me-in-production!!"
